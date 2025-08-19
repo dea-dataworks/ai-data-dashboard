@@ -3,7 +3,7 @@ import pandas as pd
 
 import src.eda as eda
 import src.ml_models as ml
-
+from src import data_preprocess
 
 # Set page configuration
 st.set_page_config(page_title="AI Data Insight Dashboard", layout="centered")
@@ -66,18 +66,13 @@ if st.session_state.df is not None:
         eda.plot_categorical(df)
 
     with tab3:
-        st.subheader("Machine Learning Insights")
-
-        target = st.selectbox("Select target column (leave empty for clustering)", [""] + df.columns.tolist())
-
-        if target:
-            if df[target].dtype == "object" or df[target].nunique() < 10:
-                ml.run_classification(df, target)
-            else:
-                ml.run_regression(df, target)
-        else:
-            clusters = st.slider("Number of clusters", 2, 10, 3)
-            ml.run_clustering(df, clusters)
+        st.subheader("⚙️ Machine Learning")
+        
+        if df is not None:
+            target = st.selectbox("Select target variable", df.columns)
+            if target:
+                X, y = data_preprocess.preprocess_df(df, target)   
+                ml.run_models(X, y, target)
            
     with tab4:
         st.subheader("LLM Report Generation")
