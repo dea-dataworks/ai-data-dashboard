@@ -107,7 +107,7 @@ def run_models(df: pd.DataFrame, target: str) -> dict:
             f1  = m.get("f1_score")
             auc = m.get("roc_auc")
             lines.append(
-                f"- {model}: Accuracy={acc:.3f} | F1 (weighted)={f1:.3f} | ROC AUC={auc:.3f if auc is not None else float('nan')}"
+                f"- {model}: Accuracy={acc:.3f} | F1 (weighted)={f1:.3f} | ROC AUC={(f'{auc:.3f}' if auc is not None else 'nan')}"
             )
     else:
         for model, m in results.items():

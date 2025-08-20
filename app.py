@@ -7,6 +7,7 @@ from src import data_preprocess
 
 from src.data_preprocess import preprocess_df
 from src.ml_models import train_and_evaluate
+import src.llm_report as llm_report
 
 # Set page configuration
 st.set_page_config(page_title="AI Data Insight Dashboard", layout="centered")
@@ -147,7 +148,8 @@ if st.session_state.df is not None:
                         summary_df = pd.DataFrame(summary_data)
 
                         # round and convert to string to force formatting
-                        summary_df_table = summary_df.applymap(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
+                        #summary_df_table = summary_df.applymap(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
+                        summary_df_table = summary_df.map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
                        
                         st.write("#### Performance Summary")
                         st.table(summary_df_table.set_index("Model"))
@@ -176,8 +178,9 @@ if st.session_state.df is not None:
 
            
     with tab4:
-        st.subheader("LLM Report Generation")
-        st.info("Leverage large language models to generate reports on your data here!")
+        # Hand off to the LLM report UI
+        report = llm_report.llm_report_tab(df, dataset_name="Titanic", target="Survived")
+        st.markdown(report)
 
 # --- Reset Button Section ---
 # Add reset button at the bottom, only if a file has been processed
