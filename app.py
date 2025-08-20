@@ -5,6 +5,9 @@ import src.eda as eda
 import src.ml_models as ml
 from src import data_preprocess
 
+from src.data_preprocess import preprocess_df
+from src.ml_models import train_and_evaluate
+
 # Set page configuration
 st.set_page_config(page_title="AI Data Insight Dashboard", layout="centered")
 st.title("AI Data Insight Dashboard")
@@ -66,13 +69,39 @@ if st.session_state.df is not None:
         eda.plot_categorical(df)
 
     with tab3:
-        st.subheader("⚙️ Machine Learning")
-        
+        st.subheader("Machine Learning")
+
         if df is not None:
             target = st.selectbox("Select target variable", df.columns)
             if target:
-                X, y = data_preprocess.preprocess_df(df, target)   
-                ml.run_models(X, y, target)
+                try:
+                    # Preprocess: safe step (drops high-cardinality, splits X/y)
+                    X, y = data_preprocess.preprocess_df(df, target)
+
+                    # Train models + evaluate
+                    output = ml.train_and_evaluate(X, y, target)
+
+                    st.write(f"### Detected Task: {output['task_type'].capitalize()}")
+
+                    # Display results per model
+                    for model, metrics in output["results"].items():
+                        st.subheader(model)
+                        for k, v in metrics.items():
+                            if isinstance(v, float):
+                                st.write(f"- **{k.replace('_',' ').title()}**: {v:.3f}")
+                            elif isinstance(v, dict):
+                                # Convert classification report dict → DataFrame for clean table
+                                report_df = pd.DataFrame(v).transpose()
+                                report_df = report_df.round(3)  # round numbers
+                                st.dataframe(report_df)
+                            elif v is not None:
+                                st.write(f"- **{k.replace('_',' ').title()}**: {v}")
+
+                except ValueError as e:
+                    st.error(str(e))
+                except Exception as e:
+                    st.error(f"Unexpected error: {e}")
+
            
     with tab4:
         st.subheader("LLM Report Generation")

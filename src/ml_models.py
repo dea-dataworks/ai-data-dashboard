@@ -1,49 +1,105 @@
-import streamlit as st
+import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.metrics import accuracy_score, classification_report, mean_squared_error, r2_score
+from sklearn.metrics import (
+    accuracy_score, f1_score, roc_auc_score, classification_report,
+    mean_squared_error, mean_absolute_error, r2_score
+)
 
-def run_models(X, y, target):
-    # Split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+
+def detect_task_type(y: pd.Series) -> str:
+    """Detect if target is classification or regression."""
+    if pd.api.types.is_numeric_dtype(y) and 1 < y.nunique() < 20:
+        return "classification"
+    elif pd.api.types.is_object_dtype(y) or pd.api.types.is_categorical_dtype(y):
+        return "classification"
+    elif pd.api.types.is_numeric_dtype(y):
+        return "regression"
+    else:
+        raise ValueError("Invalid target column type.")
+
+
+def get_preprocessor(X: pd.DataFrame) -> ColumnTransformer:
+    """Return a preprocessing pipeline for numerical + categorical features."""
+    numeric_features = X.select_dtypes(include=['int64', 'float64']).columns
+    categorical_features = X.select_dtypes(include=['object', 'category']).columns
+
+    numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='mean')),
+        ('scaler', StandardScaler())
+    ])
+
+    categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='most_frequent')),
+        ('encoder', OneHotEncoder(handle_unknown='ignore'))
+    ])
+
+    return ColumnTransformer(
+        transformers=[
+            ('num', numeric_transformer, numeric_features),
+            ('cat', categorical_transformer, categorical_features)
+        ],
+        remainder='passthrough'
     )
 
-    # Detect problem type
-    if y.dtype == "object" or y.nunique() < 20:   # 🔹 crude heuristic
-        task_type = "classification"
-    else:
-        task_type = "regression"
 
-    st.write(f"### Detected task: {task_type.capitalize()}")
+def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dict:
+    """
+    Train models (classification/regression) and return evaluation results.
+    """
+    task_type = detect_task_type(y)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42,
+        stratify=y if task_type == "classification" else None
+    )
+
+    preprocessor = get_preprocessor(X)
 
     results = {}
 
     if task_type == "classification":
         models = {
-            "Logistic Regression": LogisticRegression(max_iter=1000),
-            "Random Forest": RandomForestClassifier(n_estimators=100),
+            "Logistic Regression": LogisticRegression(max_iter=2000, random_state=42),
+            "Random Forest Classifier": RandomForestClassifier(n_estimators=100, random_state=42),
         }
+
         for name, model in models.items():
-            model.fit(X_train, y_train)
-            preds = model.predict(X_test)
-            acc = accuracy_score(y_test, preds)
-            results[name] = acc
-            st.write(f"**{name}** Accuracy: {acc:.3f}")
-            st.text(classification_report(y_test, preds))
+            pipe = Pipeline(steps=[('preprocessor', preprocessor), ('classifier', model)])
+            pipe.fit(X_train, y_train)
+
+            preds = pipe.predict(X_test)
+            probs = pipe.predict_proba(X_test)[:, 1] if hasattr(pipe, "predict_proba") else None
+
+            results[name] = {
+                "accuracy": accuracy_score(y_test, preds),
+                "f1_score": f1_score(y_test, preds, average="weighted"),
+                "roc_auc": roc_auc_score(y_test, probs) if probs is not None and y.nunique() == 2 else None,
+                "report": classification_report(y_test, preds, output_dict=True)
+            }
 
     else:  # regression
         models = {
             "Linear Regression": LinearRegression(),
-            "Random Forest": RandomForestRegressor(n_estimators=100),
+            "Random Forest Regressor": RandomForestRegressor(n_estimators=100, random_state=42),
         }
-        for name, model in models.items():
-            model.fit(X_train, y_train)
-            preds = model.predict(X_test)
-            mse = mean_squared_error(y_test, preds)
-            r2 = r2_score(y_test, preds)
-            results[name] = (mse, r2)
-            st.write(f"**{name}** MSE: {mse:.2f}, R²: {r2:.3f}")
 
-    return results
+        for name, model in models.items():
+            pipe = Pipeline(steps=[('preprocessor', preprocessor), ('regressor', model)])
+            pipe.fit(X_train, y_train)
+            preds = pipe.predict(X_test)
+
+            mse = mean_squared_error(y_test, preds)
+            results[name] = {
+                "mse": mse,
+                "rmse": mse**0.5,
+                "mae": mean_absolute_error(y_test, preds),
+                "r2_score": r2_score(y_test, preds)
+            }
+
+    return {"task_type": task_type, "results": results}
