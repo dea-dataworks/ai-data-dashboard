@@ -75,27 +75,99 @@ if st.session_state.df is not None:
             target = st.selectbox("Select target variable", df.columns)
             if target:
                 try:
-                    # Preprocess: safe step (drops high-cardinality, splits X/y)
+                    # Preprocess (safe step: drops high-cardinality, splits X/y)
                     X, y = data_preprocess.preprocess_df(df, target)
 
                     # Train models + evaluate
                     output = ml.train_and_evaluate(X, y, target)
+                    task_type = output["task_type"]
 
-                    st.write(f"### Detected Task: {output['task_type'].capitalize()}")
+                    st.write(f"### Detected Task: {task_type.capitalize()}")
 
-                    # Display results per model
-                    for model, metrics in output["results"].items():
-                        st.subheader(model)
-                        for k, v in metrics.items():
-                            if isinstance(v, float):
-                                st.write(f"- **{k.replace('_',' ').title()}**: {v:.3f}")
-                            elif isinstance(v, dict):
-                                # Convert classification report dict → DataFrame for clean table
-                                report_df = pd.DataFrame(v).transpose()
-                                report_df = report_df.round(3)  # round numbers
-                                st.dataframe(report_df)
-                            elif v is not None:
-                                st.write(f"- **{k.replace('_',' ').title()}**: {v}")
+                    # ---- Classification ----
+                    if task_type == "classification":
+                        summary_data = []
+                        for model, metrics in output["results"].items():
+                            if "classification_report" in metrics and isinstance(metrics["classification_report"], dict):
+                                f1_weighted = metrics["classification_report"]["weighted avg"]["f1-score"]
+                            else:
+                                f1_weighted = metrics.get("f1_score", None)
+
+                            summary_data.append({
+                                "Model": model,
+                                "Accuracy": metrics.get("accuracy", None),
+                                "F1 Score (weighted)": f1_weighted,
+                                "ROC AUC": metrics.get("roc_auc", None),
+                            })
+
+                        # I will save this summary_df in case I need it later
+                        summary_df = pd.DataFrame(summary_data)
+
+                        # round and convert to string to force formatting
+                        summary_df_table = summary_df.applymap(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
+
+                        st.write("#### Performance Summary")
+                        st.table(summary_df_table.set_index("Model"))
+                        
+                        # Advanced Metrics
+                        with st.expander("🔍 Advanced Metrics (per-class details)"):
+                            st.markdown("Note: `0`, `1`, etc. in **Class/Avg** are your target classes; rows like **macro avg**/**weighted avg** are aggregates.")
+                            for model, metrics in output["results"].items():
+                                st.markdown(f"**{model}**")
+                                if "classification_report" in metrics and isinstance(metrics["classification_report"], dict):
+                                    report_df = pd.DataFrame(metrics["classification_report"]).transpose()
+                                    report_df = report_df.round(3)
+                                    st.dataframe(report_df)
+                                else:
+                                    st.write("No detailed report available.")
+
+                        # Metric Definitions
+                        with st.expander("📖 Metric Definitions"):
+                            st.markdown("""
+                            - **Accuracy**: Proportion of correctly classified samples.
+                            - **F1 Score (weighted)**: Harmonic mean of precision and recall, weighted by class frequency.
+                            - **ROC AUC**: Measures how well the model separates classes; 0.5 = random, 1.0 = perfect.
+                            - **Precision**: Among predicted positives, proportion that were actually positive.
+                            - **Recall (Sensitivity)**: Among actual positives, proportion predicted correctly.
+                            - **Macro Avg**: Average across classes, treating each equally.
+                            - **Weighted Avg**: Average across classes, weighted by number of samples.
+                            """)
+
+                    # ---- Regression ----
+                    elif task_type == "regression":
+                        summary_data = []
+                        for model, metrics in output["results"].items():
+                            summary_data.append({
+                                "Model": model,
+                                "R²": metrics.get("r2", None),
+                                "MAE": metrics.get("mae", None),
+                                "RMSE": metrics.get("rmse", None),
+                            })
+                         # I will save this summary_df in case I need it later
+                        summary_df = pd.DataFrame(summary_data)
+
+                        # round and convert to string to force formatting
+                        summary_df_table = summary_df.applymap(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
+                       
+                        st.write("#### Performance Summary")
+                        st.table(summary_df_table.set_index("Model"))
+
+                        # Advanced Metrics (extra details if available)
+                        with st.expander("🔍 Advanced Metrics"):
+                            for model, metrics in output["results"].items():
+                                st.markdown(f"**{model}**")
+                                for k, v in metrics.items():
+                                    if isinstance(v, float):
+                                        st.write(f"- **{k.upper()}**: {v:.3f}")
+
+                        # Metric Definitions
+                        with st.expander("📖 Metric Definitions"):
+                            st.markdown("""
+                            - **MSE (Mean Squared Error)**: The average of the squared differences between predicted and actual values.
+                            - **RMSE (Root Mean Squared Error)**: Square root of the mean squared differences, penalizes large errors more.
+                            - **MAE (Mean Absolute Error)**: Average absolute difference between predictions and actual values.            
+                            - **R² (Coefficient of Determination)**: Proportion of variance explained by the model (1.0 = perfect).
+                            """)
 
                 except ValueError as e:
                     st.error(str(e))

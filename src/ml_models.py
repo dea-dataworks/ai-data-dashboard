@@ -80,7 +80,8 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
                 "accuracy": accuracy_score(y_test, preds),
                 "f1_score": f1_score(y_test, preds, average="weighted"),
                 "roc_auc": roc_auc_score(y_test, probs) if probs is not None and y.nunique() == 2 else None,
-                "report": classification_report(y_test, preds, output_dict=True)
+                "classification_report": classification_report(y_test, preds, output_dict=True),
+                "classification_report_text": classification_report(y_test, preds)  # optional
             }
 
     else:  # regression
@@ -103,3 +104,4 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
             }
 
     return {"task_type": task_type, "results": results}
+
