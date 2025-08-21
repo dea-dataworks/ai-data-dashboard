@@ -1,3 +1,4 @@
+from pathlib import Path
 import streamlit as st
 import pandas as pd
 
@@ -35,6 +36,7 @@ if st.session_state.df is None:
                 df = pd.read_excel(uploaded_file)
             
             st.session_state.df = df    # Store the dataframe in session state
+            st.session_state.dataset_name = Path(uploaded_file.name).stem
             st.success("File uploaded and processed sucessfully!")
             st.rerun()                  # Rerun to display the content immediately with the new df
         except Exception as e:
@@ -105,7 +107,7 @@ if st.session_state.df is not None:
                         summary_df = pd.DataFrame(summary_data)
 
                         # round and convert to string to force formatting
-                        summary_df_table = summary_df.applymap(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
+                        summary_df_table = summary_df.map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
 
                         st.write("#### Performance Summary")
                         st.table(summary_df_table.set_index("Model"))
@@ -148,7 +150,6 @@ if st.session_state.df is not None:
                         summary_df = pd.DataFrame(summary_data)
 
                         # round and convert to string to force formatting
-                        #summary_df_table = summary_df.applymap(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
                         summary_df_table = summary_df.map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
                        
                         st.write("#### Performance Summary")
@@ -178,9 +179,10 @@ if st.session_state.df is not None:
 
            
     with tab4:
-        # Hand off to the LLM report UI
-        report = llm_report.llm_report_tab(df, dataset_name="Titanic", target="Survived")
-        st.markdown(report)
+        llm_report.render_llm_tab(
+            df,
+            default_name=st.session_state.get("dataset_name", "Dataset")
+        )
 
 # --- Reset Button Section ---
 # Add reset button at the bottom, only if a file has been processed

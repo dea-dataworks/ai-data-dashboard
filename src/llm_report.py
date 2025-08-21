@@ -3,8 +3,12 @@ import numpy as np
 import pandas as pd
 
 from langchain.prompts import PromptTemplate
-from langchain_community.llms import Ollama
+from langchain_ollama import OllamaLLM
 from langchain_core.output_parsers import StrOutputParser
+
+import streamlit as st
+from typing import Optional
+from src.utils import run_models
 
 # ---------- Utilities to format data for the prompt ----------
 
@@ -40,6 +44,15 @@ def _safe_corr_with_target(df: pd.DataFrame, target: str, top_k: int = 10) -> Di
     corr_series = corr_series.reindex(corr_series.abs().sort_values(ascending=False).index)
     return corr_series.head(top_k).round(3).to_dict()
 
+def _trim_corr_text(corr_dict: Dict[str, float], min_abs: float = 0.10, max_items: int = 8) -> str:
+    if not corr_dict:
+        return "No strong correlations (|r| ≥ 0.10)."
+    strong = [(k, v) for k, v in corr_dict.items() if abs(v) >= min_abs]
+    if not strong:
+        return "No strong correlations (|r| ≥ 0.10)."
+    strong = strong[:max_items]
+    return "\n".join(f"- {k}: {v:+.3f}" for k, v in strong)
+
 def _class_balance(df: pd.DataFrame, target: str) -> Dict[Any, int]:
     if target not in df.columns:
         return {}
@@ -54,6 +67,24 @@ def _missing_values(df: pd.DataFrame) -> Dict[str, int]:
     miss = miss[miss > 0].sort_values(ascending=False)
     return miss.to_dict()
 
+def _shape_pretty(df: pd.DataFrame) -> str:
+    return f"{df.shape[0]} rows × {df.shape[1]} columns"
+
+def _key_vars_human(df: pd.DataFrame, max_vars: int = 7) -> str:
+    cols = list(df.columns[:max_vars])
+    # Light grouping hint (names only, keeps it generic across datasets)
+    return ", ".join(cols)
+
+def _corr_to_sentences(corr_dict: Dict[str, float], target: Optional[str]) -> str:
+    if not corr_dict:
+        return "No strong correlations (|r| ≥ 0.10)."
+    tgt = target or "the target"
+    lines = []
+    for feat, r in corr_dict.items():
+        direction = "positively" if r > 0 else "negatively"
+        lines.append(f"- {feat} is {direction} associated with {tgt} (r = {r:+.3f}).")
+    return "\n".join(lines)
+
 # ---------- Main function: compute stats, call LLM ----------
 
 def llm_report_tab(
@@ -64,6 +95,7 @@ def llm_report_tab(
     feature_importances: Optional[Dict[str, float]] = None,
     recommendations: Optional[str] = None,
     llm_model_name: str = "mistral",
+    models_table_md: Optional[str] = None,
     top_k_corr: int = 10,
 ) -> str:
     """
@@ -80,6 +112,22 @@ def llm_report_tab(
     class_balance = _class_balance(df, target) if target else {}
     missing_vals = _missing_values(df)
     correlations = _safe_corr_with_target(df, target, top_k=top_k_corr) if target else {}
+    correlations_text = _trim_corr_text(correlations, min_abs=0.10, max_items=8)
+    correlations_sent = _corr_to_sentences(correlations, target)
+
+    sentences = []
+    if correlations:
+        for feat, r in list(correlations.items()):
+            if abs(r) < 0.10:
+                continue
+            strength = "slightly " if abs(r) < 0.20 else "moderately " if abs(r) < 0.40 else "strongly "
+            direction = "positive" if r > 0 else "negative"
+            tgt = target or "the target"
+            if abs(r) >= 0.20:
+                sentences.append(f"- {feat} shows a {strength}{direction} association with {tgt} (r = {r:+.2f}).")
+            else:
+                sentences.append(f"- {feat} shows a {strength}{direction} association with {tgt}.")
+    correlations_sent = "\n".join(sentences[:3]) if sentences else "No strong correlations (|r| ≥ 0.10)."
 
     # Default recs if none provided
     if not recommendations:
@@ -103,59 +151,63 @@ def llm_report_tab(
 
     # ---- Prompt template (tight, structured, no guessing) ----
     template = """
-You are an AI data analyst. Write a structured, factual report based ONLY on the provided fields.
-Do NOT guess or invent values. If a field is "not available", say so plainly.
-Do NOT claim "data leakage" unless explicitly stated in the inputs.
+            You are a precise data analyst. Produce a concise, client-ready Markdown report.
+            Follow these rules strictly:
+            - Express shape as "rows × columns" (not a Python tuple).
+            - Group variables by meaning when possible; do not dump long lists.
+            - Write correlations in plain English; include r only in parentheses.
+            - Avoid hedging like "if significant"; be direct and actionable.
+            - Fix typos. Use short sentences and bullets.
 
-Title: Data Analysis Report for {dataset_name}
+            # Data Analysis Report for {dataset_name}
 
-## Dataset Overview
-- Shape (rows, columns): {shape}
-- Column types: 
-{column_types}
-- Example columns: {sample_columns}
-- Class balance for target "{target}": 
-{class_balance}
+            ## Dataset Overview
+            - Shape: {shape}
+            - Key variables (brief): {sample_columns}
+            - Class balance for target "{target}":
+            {class_balance}
 
-## Data Quality
-- Missing values per column:
-{missing_values}
-- Potential issues: If missing values are high for any column, note the top offenders. Otherwise say "no major issues identified."
+            ## Data Quality
+            - Missing values (top offenders):
+            {missing_values}
 
-## Correlations & Feature Insights
-- Key correlations with target (|corr| strongest first):
-{correlations}
-- Feature importances (if available):
-{feature_importances}
+            ## Correlations & Feature Insights
+            {correlations}
+            - Feature importances (if available):
+            {feature_importances}
 
-## Model Performance
-- Models compared: {model_list}
-- Metrics (per model):
-{model_metrics}
+            ## Model Performance
+            - One-sentence comparison: which model is best and by roughly how much (accuracy/F1/AUC).
+            - Metrics (per model):
 
-## Recommendations
-{recommendations}
-"""
+            {models_table_md}
+
+            ## Recommendations
+            Provide 4–6 concrete steps tailored to this dataset. Be specific (what to impute, what to drop, what to engineer, how to validate).
+            """
 
     prompt = PromptTemplate(
         template=template.strip(),
         input_variables=[
-            "dataset_name", "shape", "column_types", "sample_columns", "target",
+            "dataset_name", "shape", "column_types", "sample_columns", "target", 
             "class_balance", "missing_values", "correlations", "feature_importances",
-            "model_list", "model_metrics", "recommendations"
+            "model_list", "model_metrics", "recommendations", "models_table_md"
         ],
     )
 
     # ---- Build inputs (as readable bullet lists / strings) ----
     inputs = {
         "dataset_name": dataset_name,
-        "shape": str(shape),
+        "models_table_md": models_table_md or "Not run.",
+        #"shape": str(shape),
+        "shape": _shape_pretty(df),
         "column_types": _fmt_dict(col_types, max_items=50),
-        "sample_columns": ", ".join(sample_columns) if sample_columns else "not available",
+        "sample_columns": _key_vars_human(df),
+        #"sample_columns": ", ".join(sample_columns[:7]) if sample_columns else "not available", 
         "target": target or "not specified",
         "class_balance": _fmt_dict(class_balance, max_items=20) if class_balance else "not available",
         "missing_values": _fmt_dict(missing_vals, max_items=50) if missing_vals else "no missing values",
-        "correlations": _fmt_dict(correlations, max_items=top_k_corr) if correlations else "not available",
+        "correlations": correlations_sent,
         "feature_importances": feature_importances_str if feature_importances else "not available",
         "model_list": ", ".join(model_list) if model_list else "not available",
         "model_metrics": model_metrics_str if model_metrics else "not available",
@@ -163,8 +215,112 @@ Title: Data Analysis Report for {dataset_name}
     }
 
     # ---- Runnable pipeline: prompt | llm | StrOutputParser ----
-    llm = Ollama(model=llm_model_name)
+    llm = OllamaLLM(model=llm_model_name)
     chain = prompt | llm | StrOutputParser()
 
     report: str = chain.invoke(inputs)
     return report
+
+def _format_model_metrics(models_output: dict | None) -> str:
+    """
+    Build a Markdown table from your models_output dict.
+    Supports both classification (accuracy, f1, roc_auc) and regression (r2, mae, rmse).
+    Returns '' if nothing to show.
+    """
+    if not models_output or "results" not in models_output:
+        return ""
+
+    results = models_output["results"]
+    # Heuristically detect task type from first model’s keys
+    sample = next(iter(results.values()))
+    is_classification = "accuracy" in sample or "f1_score" in sample or "roc_auc" in sample
+
+    lines = []
+    if is_classification:
+        lines.append("| Model | Accuracy | F1 (weighted) | ROC AUC |")
+        lines.append("|---|---:|---:|---:|")
+        for model, m in results.items():
+            acc = m.get("accuracy", float("nan"))
+            f1  = m.get("f1_score", float("nan"))
+            auc = m.get("roc_auc", None)
+            auc_str = f"{auc:.3f}" if isinstance(auc, (int, float)) else "—"
+            lines.append(f"| {model} | {acc:.3f} | {f1:.3f} | {auc_str} |")
+    else:
+        lines.append("| Model | R² | MAE | RMSE |")
+        lines.append("|---|---:|---:|---:|")
+        for model, m in results.items():
+            r2  = m.get("r2_score", float("nan"))
+            mae = m.get("mae", float("nan"))
+            rmse = m.get("rmse", float("nan"))
+            lines.append(f"| {model} | {r2:.3f} | {mae:.3f} | {rmse:.3f} |")
+
+    return "\n".join(lines)
+
+
+def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
+    """Streamlit UI for the LLM Report tab."""
+    st.subheader("LLM Report Generation")
+
+    # Dataset name (prefill from uploaded filename if available)
+    dataset_name = st.text_input("Dataset name", value=default_name)
+
+    # Optional modeling
+    include_modeling = st.checkbox("Include ML modeling in the report", value=False)
+
+    target: Optional[str] = None
+    model_metrics = None
+    feature_importances = None  # (optional later)
+
+    if include_modeling:
+        # Let user choose the target
+        target = st.selectbox("Select target column", options=list(df.columns))
+        st.caption("Tip: choose your label column for classification/regression.")
+
+    models_table_md = ""
+    if st.button("Generate Report"):
+        with st.spinner("Analyzing dataset with AI..."):
+            # If modeling requested and target chosen, run models to get metrics text
+            if include_modeling and target:
+                out = run_models(df, target)  # returns task_type, results, text_summary
+                models_table_md = _format_model_metrics(out)
+                # Convert results into a compact metrics dict per model for the prompt
+                # Classification vs regression keys differ; handle both
+                metrics_dict = {}
+                if out["task_type"] == "classification":
+                    for model, m in out["results"].items():
+                        metrics_dict[model] = {
+                            "accuracy": round(m.get("accuracy", float("nan")), 3),
+                            "f1_weighted": round(m.get("f1_score", float("nan")), 3),
+                            "roc_auc": (round(m["roc_auc"], 3) if m.get("roc_auc") is not None else "na"),
+                        }
+                else:
+                    for model, m in out["results"].items():
+                        metrics_dict[model] = {
+                            "r2": round(m.get("r2_score", float("nan")), 3),
+                            "mae": round(m.get("mae", float("nan")), 3),
+                            "rmse": round(m.get("rmse", float("nan")), 3),
+                        }
+                model_metrics = metrics_dict
+
+            # Build the narrative using the existing function
+            report_text = llm_report_tab(
+                df=df,
+                dataset_name=dataset_name or "Dataset",
+                target=target,
+                model_metrics=model_metrics,
+                feature_importances=feature_importances,
+                llm_model_name="mistral",
+                top_k_corr=10,
+                # NEW
+                models_table_md=models_table_md,
+            )
+
+            st.subheader("Generated Report")
+            st.markdown(report_text)
+
+            st.download_button(
+                label="Download report (Markdown)",
+                data=report_text.encode("utf-8"),
+                file_name=f"{dataset_name or 'dataset'}_report.md",
+                mime="text/markdown"
+            )
