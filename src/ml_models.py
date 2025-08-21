@@ -26,8 +26,8 @@ def detect_task_type(y: pd.Series) -> str:
 
 def get_preprocessor(X: pd.DataFrame) -> ColumnTransformer:
     """Return a preprocessing pipeline for numerical + categorical features."""
-    numeric_features = X.select_dtypes(include=['int64', 'float64']).columns
-    categorical_features = X.select_dtypes(include=['object', 'category']).columns
+    numeric_features = X.select_dtypes(include=['number']).columns
+    categorical_features = X.select_dtypes(include=['object', 'category', 'bool']).columns
 
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='mean')),

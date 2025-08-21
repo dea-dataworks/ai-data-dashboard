@@ -16,9 +16,10 @@ Upload your dataset (CSV or Excel), run exploratory data analysis (EDA), generat
 
 ## 🚀 Quickstart
 
-Requires Python 3.11 (recommended). Other versions may fail to install scientific packages on Windows.
+Tested on Python 3.13. If you encounter dependency issues on newer versions, use 3.11.
 The **LLM Report** tab requires [Ollama](https://ollama.com/) installed locally with the **Mistral** model pulled.
 Without Ollama + Mistral, the dashboard still runs, but the LLM Report tab will not function.
+
 
 ### 1. Clone the repository
 
@@ -56,5 +57,19 @@ ollama pull mistral
 ### 5. Run the app
 
 ```bash
-streamlit run src/app.py
+streamlit run app.py
 ```
+
+## Example Datasets
+
+Two small sample datasets are included for quick testing:
+
+- **titanic.csv** – trimmed to 50 rows; can be used to test a **classification** workflow (predicting survival).  
+- **insurance.csv** – trimmed to 50 rows; can be used to test a **regression** workflow (predicting charges).  
+
+You can also upload your own CSV/XLSX datasets.
+
+## Notes on Preprocessing
+
+- **High-cardinality text columns**: During preprocessing, text columns with many unique values (IDs, tickets, free-text, etc.) may be dropped to keep models tractable. This is expected; it avoids exploding the feature space.
+- **Missing values**: For model training, numeric columns have missing values imputed with the column mean, and categorical columns are imputed with the most frequent category. The original data preview (EDA tab) still shows missing values before preprocessing.

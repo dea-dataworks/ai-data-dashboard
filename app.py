@@ -2,10 +2,16 @@ from pathlib import Path
 import streamlit as st
 import pandas as pd
 
+# import eda
+# import ml_models as ml
+# import data_preprocess
+# from ml_models import train_and_evaluate
+# import llm_report 
+#from data_preprocess import preprocess_df
+
 import src.eda as eda
 import src.ml_models as ml
 from src import data_preprocess
-
 from src.data_preprocess import preprocess_df
 from src.ml_models import train_and_evaluate
 import src.llm_report as llm_report
@@ -142,7 +148,8 @@ if st.session_state.df is not None:
                         for model, metrics in output["results"].items():
                             summary_data.append({
                                 "Model": model,
-                                "R²": metrics.get("r2", None),
+                                #"R²": metrics.get("r2", None),
+                                "R²": metrics.get("r2_score", None),
                                 "MAE": metrics.get("mae", None),
                                 "RMSE": metrics.get("rmse", None),
                             })

@@ -303,17 +303,25 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
                 model_metrics = metrics_dict
 
             # Build the narrative using the existing function
-            report_text = llm_report_tab(
-                df=df,
-                dataset_name=dataset_name or "Dataset",
-                target=target,
-                model_metrics=model_metrics,
-                feature_importances=feature_importances,
-                llm_model_name="mistral",
-                top_k_corr=10,
-                # NEW
-                models_table_md=models_table_md,
-            )
+            try:
+                report_text = llm_report_tab(
+                    df=df,
+                    dataset_name=dataset_name or "Dataset",
+                    target=target,
+                    model_metrics=model_metrics,
+                    feature_importances=feature_importances,
+                    llm_model_name="mistral",
+                    top_k_corr=10,
+                    # NEW
+                    models_table_md=models_table_md,
+                )
+            except Exception as e:
+                st.error(
+                    "LLM Report requires Ollama + Mistral.\n"
+                    "Install Ollama and run: `ollama pull mistral`.\n"
+                    f"Original error: {e}"
+                )
+                return
 
             st.subheader("Generated Report")
             st.markdown(report_text)
