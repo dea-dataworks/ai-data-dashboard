@@ -5,7 +5,7 @@ Upload your dataset (CSV or Excel), run exploratory data analysis (EDA), generat
 
 ---
 
-## ✨ Features (v0.1)
+## Features (v0.1)
 - **Upload CSV/Excel** and preview your dataset
 - **EDA tab**: summary stats, missing values, correlations, distributions
 - **ML Insights tab**: automatic classification/regression detection, performance tables, and metric explanations
@@ -14,7 +14,7 @@ Upload your dataset (CSV or Excel), run exploratory data analysis (EDA), generat
 
 ---
 
-## 🚀 Quickstart
+## Quickstart
 
 Tested on Python 3.13. If you encounter dependency issues on newer versions, use 3.11.
 The **LLM Report** tab requires [Ollama](https://ollama.com/) installed locally with the **Mistral** model pulled.
