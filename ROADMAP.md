@@ -1,11 +1,34 @@
 # Roadmap
 
-## v0.2 (Portfolio-ready polish)
-- EDA: schema panel, outliers boxplot, target-relationship (mutual info), leakage/duplicates check.
-- ML: baselines, optional K-fold CV (mean±std), confusion matrix/ROC/PR, residuals & prediction error plots.
-- Interpretability: RF permutation + built-in importances (top-10).
-- Exports: metrics CSV/XLSX, plots PNG, clipboard copy for report.
-- Report: include importances/plots summary, tighten recommendations.
+## v0.2 (Freelance-ready)
+### Phase 0 — Repo sanity ✅
+- Move modules to `src/`, add `__init__.py`, update `.gitignore`.
 
-## v1.0 (Client-ready)
-- Configurable pipelines, model saving/loading, simple hyperparam tuning UI, basic SHAP, multi-target support.
+### Phase 1 — EDA Schema Panel (current)
+- Snapshot: numeric/categorical/datetime/bool counts, memory, % missing overall.
+- Top‑5 high‑cardinality text columns.
+
+### Phase 2 — Outliers & quick relationships
+- Boxplot for numeric; value counts (top‑N) for categorical.
+- (Stretch) Mutual information vs target.
+
+### Phase 3 — Data quality warnings
+- Duplicates count; leakage checks (feature == target; |corr|≥0.95 numeric).
+
+### Phase 4 — ML baselines + visuals
+- DummyClassifier/Regressor; confusion matrix (clf); residuals & y vs ŷ (reg).
+
+### Phase 5 — Optional K‑fold CV
+- 5‑fold mean±std for main metrics; toggle in UI.
+
+### Phase 6 — Feature importance
+- RF built‑in + permutation importances; top‑10 bar; pass to report.
+
+### Phase 7 — Exports
+- Metrics CSV/Excel; plots PNG download.
+
+### Phase 8 — LLM report polish
+- Include importances summary; (stretch) provider toggle.
+
+### Phase 9 — README polish + release
+- GIFs, screenshots, client value section; tag v0.2.0.

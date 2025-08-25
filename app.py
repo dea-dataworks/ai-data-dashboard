@@ -67,8 +67,23 @@ if st.session_state.df is not None:
 
     with tab2:
         st.subheader("Exploratory Data Analysis")
+        
+        eda.show_schema_panel(df)
+
+        st.markdown("---")  
         eda.show_summary(df)
-        st.markdown("---") # Visual separator
+        st.markdown("---")
+        eda.show_missing(df)
+        st.markdown("---")
+        eda.show_correlation(df)
+        st.markdown("---")
+        eda.plot_distributions(df)
+        st.markdown("---")
+        eda.plot_categorical(df)
+
+        st.subheader("Exploratory Data Analysis")
+        eda.show_summary(df)
+        st.markdown("---") 
         eda.show_missing(df)
         st.markdown("---")
         eda.show_correlation(df)

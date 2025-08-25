@@ -73,3 +73,7 @@ You can also upload your own CSV/XLSX datasets.
 
 - **High-cardinality text columns**: During preprocessing, text columns with many unique values (IDs, tickets, free-text, etc.) may be dropped to keep models tractable. This is expected; it avoids exploding the feature space.
 - **Missing values**: For model training, numeric columns have missing values imputed with the column mean, and categorical columns are imputed with the most frequent category. The original data preview (EDA tab) still shows missing values before preprocessing.
+
+## What a client gets in v0.2
+
+TO BE FILLED AT THE END

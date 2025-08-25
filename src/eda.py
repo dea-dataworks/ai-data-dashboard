@@ -3,6 +3,56 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import streamlit as st
 
+# --- Schema / Snapshot panel ---
+def show_schema_panel(df: pd.DataFrame) -> None:
+    """
+    Read-only snapshot of the dataset: dtype counts, memory, overall missing, and
+    top-5 high-cardinality text columns.
+    """
+    st.subheader("Dataset Snapshot")
+
+    # Type counts
+    num_cols = df.select_dtypes(include=["number"]).columns
+    cat_cols = df.select_dtypes(include=["object", "category", "string"]).columns
+    bool_cols = df.select_dtypes(include=["bool"]).columns
+    dt_cols  = df.select_dtypes(include=["datetime64[ns]", "datetime64[ns, UTC]"]).columns
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    with c1:
+        st.metric("Rows", f"{df.shape[0]:,}")
+    with c2:
+        st.metric("Columns", f"{df.shape[1]:,}")
+    with c3:
+        st.metric("Numeric", f"{len(num_cols)}")
+    with c4:
+        st.metric("Categorical", f"{len(cat_cols)}")
+    with c5:
+        st.metric("Datetime/Bool", f"{len(dt_cols)}/{len(bool_cols)}")
+
+    # Memory + overall missing
+    mem_mb = df.memory_usage(deep=True).sum() / (1024 ** 2)
+    overall_missing_pct = (df.isna().sum().sum() / df.size * 100) if df.size else 0.0
+
+    c6, c7 = st.columns(2)
+    with c6:
+        st.metric("Memory (MB)", f"{mem_mb:.2f}")
+    with c7:
+        st.metric("Overall Missing (%)", f"{overall_missing_pct:.2f}%")
+
+    # High-cardinality text columns (top 5)
+    if len(cat_cols) > 0:
+        card = (
+            df[cat_cols]
+            .nunique(dropna=True)
+            .sort_values(ascending=False)
+            .head(5)
+            .rename("unique_values")
+        )
+        st.markdown("**Top‑5 High‑Cardinality Text Columns**")
+        st.dataframe(card.to_frame())
+    else:
+        st.info("No object/category/string columns detected.")
+        
 # summary
 def show_summary(df):
     st.subheader("Basic Statistics")
