@@ -163,3 +163,15 @@ def plot_regression_diagnostics(y_true, y_pred):
     figs.append(fig2)
 
     return figs
+
+def plot_feature_importances(importances: dict, top_n: int = 10):
+    if not importances:
+        return None
+
+    s = pd.Series(importances).sort_values(ascending=False).head(top_n)
+    fig, ax = plt.subplots()
+    s.plot(kind="barh", ax=ax)
+    ax.set_xlabel("Importance")
+    ax.set_title(f"Top {top_n} Features (Random Forest)")
+    plt.gca().invert_yaxis()
+    return fig

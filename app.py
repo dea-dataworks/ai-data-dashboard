@@ -178,7 +178,17 @@ if st.session_state.df is not None:
                                         st.dataframe(report_df)
                                     else:
                                         st.write("No detailed report available.")
+                            
+                            # Feature Importance (Random Forest Only)
+                            with st.expander("🌳 Feature Importances (Random Forest)"):
+                                for model, metrics in output["results"].items():
+                                    if "feature_importances" in metrics and metrics["feature_importances"]:
+                                        fig = utils.plot_feature_importances(metrics["feature_importances"])
+                                        if fig:
+                                            st.markdown(f"**{model}**")
+                                            st.pyplot(fig)
 
+                            # Model Diagnostics
                             with st.expander("📊 Model Diagnostics (Visuals)"):
                                 st.caption("Visual plots to help interpret classification performance.")
 
@@ -247,6 +257,16 @@ if st.session_state.df is not None:
                                         if isinstance(v, float):
                                             st.write(f"- **{k.upper()}**: {v:.3f}")
 
+                            # Feature Importance (Random Forest Only)
+                            with st.expander("🌳 Feature Importances (Random Forest)"):
+                                for model, metrics in output["results"].items():
+                                    if "feature_importances" in metrics and metrics["feature_importances"]:
+                                        fig = utils.plot_feature_importances(metrics["feature_importances"])
+                                        if fig:
+                                            st.markdown(f"**{model}**")
+                                            st.pyplot(fig)
+                            
+                            # Model Diagnostics
                             with st.expander("📊 Model Diagnostics (Visuals)"):
                                     st.caption("Visual plots to help interpret model performance.")
 

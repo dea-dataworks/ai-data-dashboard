@@ -91,6 +91,13 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
                 "probs": probs,
                 }
 
+            if isinstance(model, RandomForestClassifier):
+                try:
+                    importances = pipe.named_steps["classifier"].feature_importances_
+                    feature_names = pipe.named_steps["preprocessor"].get_feature_names_out()
+                    results[name]["feature_importances"] = dict(zip(feature_names, importances))
+                except Exception:
+                    results[name]["feature_importances"] = {}
     else:  # regression
         models = {
             "Dummy Regressor": DummyRegressor(strategy="mean"),
@@ -111,6 +118,14 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
                 "r2_score": r2_score(y_test, preds),
                 "preds": preds
             }
+
+            if isinstance(model, RandomForestRegressor):
+                try:
+                    importances = pipe.named_steps["regressor"].feature_importances_
+                    feature_names = pipe.named_steps["preprocessor"].get_feature_names_out()
+                    results[name]["feature_importances"] = dict(zip(feature_names, importances))
+                except Exception:
+                    results[name]["feature_importances"] = {}
 
     return {"task_type": task_type, "results": results, "y_test": y_test}
 
