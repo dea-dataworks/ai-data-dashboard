@@ -1,6 +1,7 @@
 from pathlib import Path
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # import eda
 # import ml_models as ml
@@ -8,6 +9,8 @@ import pandas as pd
 # from ml_models import train_and_evaluate
 # import llm_report 
 #from data_preprocess import preprocess_df
+
+import src.utils as utils
 
 import src.eda as eda
 import src.ml_models as ml
@@ -102,6 +105,7 @@ if st.session_state.df is not None:
                     # Train models + evaluate
                     output = ml.train_and_evaluate(X, y, target)
                     task_type = output["task_type"]
+                    y_test = output["y_test"]
 
                     st.write(f"### Detected Task: {task_type.capitalize()}")
 
@@ -142,6 +146,34 @@ if st.session_state.df is not None:
                                 else:
                                     st.write("No detailed report available.")
 
+                        with st.expander("📊 Model Diagnostics (Visuals)"):
+                            st.caption("Visual plots to help interpret classification performance.")
+
+                            for model, metrics in output["results"].items():
+                                if "classification_report" in metrics:  
+                                    st.markdown(f"**{model}**")
+
+                                    preds = metrics.get("preds")
+                                    probs = metrics.get("probs")
+                                    if preds is None:
+                                        st.info("No predictions available for this model.")
+                                        continue
+
+                                    # Confusion Matrix
+                                    st.caption("• Confusion Matrix: shows how many samples were correctly or incorrectly classified.")
+                                    fig = utils.plot_confusion_matrix(y_test, preds, labels=sorted(y.unique()))
+                                    st.pyplot(fig)
+                                    plt.close(fig)
+
+                                    # ROC Curve (only for binary classification and if probabilities available)
+                                    if probs is not None and y.nunique() == 2:
+                                        st.caption("• ROC Curve: visualizes the model's ability to separate classes; higher curve = better.")
+                                        fig = utils.plot_roc_curve(y_test, probs)
+                                        st.pyplot(fig)
+                                        plt.close(fig)
+
+                                    st.markdown("---")
+
                         # Metric Definitions
                         with st.expander("📖 Metric Definitions"):
                             st.markdown("""
@@ -181,6 +213,30 @@ if st.session_state.df is not None:
                                 for k, v in metrics.items():
                                     if isinstance(v, float):
                                         st.write(f"- **{k.upper()}**: {v:.3f}")
+
+                        with st.expander("📊 Model Diagnostics (Visuals)"):
+                                st.caption("Visual plots to help interpret model performance.")
+
+                                for model, metrics in output["results"].items():
+                                    if "r2_score" in metrics:  
+                                        st.markdown(f"**{model}**")
+
+                                        preds = metrics.get("preds")
+                                        if preds is None:
+                                            st.info("No predictions available for this model.")
+                                            continue
+
+                                        figs = utils.plot_regression_diagnostics(y_test, preds)
+
+                                        st.caption("• Residuals vs Fitted: errors should be scattered randomly if the model fits well.")
+                                        st.pyplot(figs[0]) 
+                                        plt.close(figs[0])
+
+                                        st.caption("• Prediction Error Plot: closer points to the diagonal line mean better predictions.")
+                                        st.pyplot(figs[1])
+                                        plt.close(figs[1])
+
+                                        st.markdown("---")
 
                         # Metric Definitions
                         with st.expander("📖 Metric Definitions"):

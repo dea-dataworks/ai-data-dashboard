@@ -8,8 +8,11 @@ from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import (
     accuracy_score, f1_score, roc_auc_score, classification_report,
-    mean_squared_error, mean_absolute_error, r2_score
+    mean_squared_error, mean_absolute_error, r2_score,
+     ConfusionMatrixDisplay, RocCurveDisplay
 )
+from sklearn.dummy import DummyClassifier, DummyRegressor
+
 
 
 def detect_task_type(y: pd.Series) -> str:
@@ -65,6 +68,7 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
 
     if task_type == "classification":
         models = {
+            "Dummy Classifier": DummyClassifier(strategy="most_frequent"),
             "Logistic Regression": LogisticRegression(max_iter=2000, random_state=42),
             "Random Forest Classifier": RandomForestClassifier(n_estimators=100, random_state=42),
         }
@@ -81,11 +85,14 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
                 "f1_score": f1_score(y_test, preds, average="weighted"),
                 "roc_auc": roc_auc_score(y_test, probs) if probs is not None and y.nunique() == 2 else None,
                 "classification_report": classification_report(y_test, preds, output_dict=True),
-                "classification_report_text": classification_report(y_test, preds)  # optional
-            }
+                "classification_report_text": classification_report(y_test, preds),  # optional
+                "preds": preds,
+                "probs": probs,
+                }
 
     else:  # regression
         models = {
+            "Dummy Regressor": DummyRegressor(strategy="mean"),
             "Linear Regression": LinearRegression(),
             "Random Forest Regressor": RandomForestRegressor(n_estimators=100, random_state=42),
         }
@@ -100,8 +107,9 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
                 "mse": mse,
                 "rmse": mse**0.5,
                 "mae": mean_absolute_error(y_test, preds),
-                "r2_score": r2_score(y_test, preds)
+                "r2_score": r2_score(y_test, preds),
+                "preds": preds
             }
 
-    return {"task_type": task_type, "results": results}
+    return {"task_type": task_type, "results": results, "y_test": y_test}
 

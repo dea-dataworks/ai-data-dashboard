@@ -5,6 +5,8 @@ from io import StringIO
 
 from .data_preprocess import preprocess_df
 from .ml_models import train_and_evaluate
+import matplotlib.pyplot as plt
+from sklearn.metrics import ConfusionMatrixDisplay, RocCurveDisplay
 
 # ---------- EDA text utilities ----------
 
@@ -123,3 +125,41 @@ def run_models(df: pd.DataFrame, target: str) -> dict:
         "results": results,
         "text_summary": "\n".join(lines)
     }
+
+def plot_confusion_matrix(y_true, y_pred, labels):
+    fig, ax = plt.subplots()
+    #disp = ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels=labels, cmap="Blues", ax=ax)
+    ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels=labels, cmap="Blues", ax=ax)
+    #plt.close(fig)
+
+    return fig
+
+def plot_roc_curve(y_true, y_proba):
+    fig, ax = plt.subplots()
+    RocCurveDisplay.from_predictions(y_true, y_proba, ax=ax)
+    #plt.close(fig)
+    return fig
+
+def plot_regression_diagnostics(y_true, y_pred):
+    figs = []
+
+    # Residuals vs fitted
+    fig1, ax1 = plt.subplots()
+    residuals = y_true - y_pred
+    ax1.scatter(y_pred, residuals, alpha=0.6)
+    ax1.axhline(0, color="red", linestyle="--")
+    ax1.set_xlabel("Predicted")
+    ax1.set_ylabel("Residuals")
+    ax1.set_title("Residuals vs Fitted")
+    figs.append(fig1)
+
+    # y vs yhat
+    fig2, ax2 = plt.subplots()
+    ax2.scatter(y_true, y_pred, alpha=0.6)
+    ax2.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], "r--")
+    ax2.set_xlabel("Actual")
+    ax2.set_ylabel("Predicted")
+    ax2.set_title("Prediction Error Plot")
+    figs.append(fig2)
+
+    return figs
