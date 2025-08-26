@@ -2,6 +2,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import streamlit as st
+from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
+
+# # Unique key helper: guarantees uniqueness even if a widget is created twice
+# def _unique_key(name: str) -> str:
+#     counter_key = f"__key_counter__{name}"
+#     idx = st.session_state.get(counter_key, 0)
+#     st.session_state[counter_key] = idx + 1
+#     return f"{name}_{idx}"
 
 # --- Schema / Snapshot panel ---
 def show_schema_panel(df: pd.DataFrame) -> None:
@@ -91,7 +99,7 @@ def show_correlation(df):
 def plot_distributions(df):
     st.subheader("Feature Distributions")
     st.write("This section allows you to visualize the distribution of numerical features using **histograms** and **Kernel Density Estimates (KDE)**. Histograms show the frequency of data points within specific bins, while KDE provides a smooth estimate of the data's probability density.")
-    col = st.selectbox("Select a numeric column", df.select_dtypes(include=["int64", "float64"]).columns)
+    col = st.selectbox("Select a numeric column", df.select_dtypes(include=["int64", "float64"]).columns, key="eda_plot_distributions_numeric_select")
     fig, ax = plt.subplots()
     sns.histplot(df[col], bins=30, kde=True, ax=ax)
     st.pyplot(fig)
@@ -109,7 +117,7 @@ def plot_categorical(df):
             plottable_cat_cols.append(col)
 
     if len(plottable_cat_cols) > 0:
-        col = st.selectbox("Select a categorical column", plottable_cat_cols)
+        col = st.selectbox("Select a categorical column", plottable_cat_cols, key="eda_plot_categorical_select")
         fig, ax = plt.subplots()
         df[col].value_counts().plot(kind="bar", ax=ax)
         ax.set_ylabel("Count")
@@ -117,4 +125,55 @@ def plot_categorical(df):
     else:
         st.info("No categorical columns detected.")
 
+# --- Boxplot for numeric columns ---
+def show_boxplot(df: pd.DataFrame) -> None:
+    st.subheader("Outlier Detection (Boxplot)")
+    num_cols = df.select_dtypes(include=["number"]).columns
+    if len(num_cols) == 0:
+        st.info("No numeric columns available for boxplot.")
+        return
+    col = st.selectbox("Select a numeric column for boxplot", num_cols, key="eda_show_boxplot_numeric_select")
+    fig, ax = plt.subplots()
+    sns.boxplot(x=df[col], ax=ax)
+    st.pyplot(fig)
+    plt.close(fig)
+
+# --- Value counts for categorical columns ---
+def show_value_counts(df: pd.DataFrame) -> None:
+    st.subheader("Value Counts (Categorical)")
+    cat_cols = df.select_dtypes(include=["object", "category"]).columns
+    if len(cat_cols) == 0:
+        st.info("No categorical columns available for value counts.")
+        return
+    col = st.selectbox("Select a categorical column", cat_cols, key="eda_show_value_counts_select")
+    counts = df[col].value_counts(dropna=False).to_frame("count")
+    st.dataframe(counts)
+
+# --- Mutual Information vs Target ---
+def show_mutual_information(df: pd.DataFrame, target: str | None = None) -> None:
+    st.subheader("Feature Relevance (Mutual Information)")
+    if target is None or target not in df.columns:
+        st.info("Select a target in the ML tab to compute mutual information.")
+        return
+
+    X = df.drop(columns=[target])
+    y = df[target]
+
+    # Only keep columns with usable dtypes
+    X = X.copy()
+    for col in X.select_dtypes(include=["object", "category"]).columns:
+        X[col] = X[col].astype("category")
+
+    try:
+        if pd.api.types.is_numeric_dtype(y) and y.nunique() > 20:
+            scores = mutual_info_regression(X, y, discrete_features="auto", random_state=42)
+        else:
+            scores = mutual_info_classif(X, y, discrete_features="auto", random_state=42)
+
+        mi = pd.Series(scores, index=X.columns).sort_values(ascending=False)
+        st.bar_chart(mi)
+
+        st.caption("Higher values = stronger dependency between feature and target.")
+    except Exception as e:
+        st.error(f"Could not compute mutual information: {e}")
 

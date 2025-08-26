@@ -67,7 +67,7 @@ if st.session_state.df is not None:
 
     with tab2:
         st.subheader("Exploratory Data Analysis")
-        
+
         eda.show_schema_panel(df)
 
         st.markdown("---")  
@@ -79,24 +79,21 @@ if st.session_state.df is not None:
         st.markdown("---")
         eda.plot_distributions(df)
         st.markdown("---")
-        eda.plot_categorical(df)
-
-        st.subheader("Exploratory Data Analysis")
-        eda.show_summary(df)
-        st.markdown("---") 
-        eda.show_missing(df)
+        eda.plot_categorical(df)      
         st.markdown("---")
-        eda.show_correlation(df)
+        eda.show_boxplot(df)
         st.markdown("---")
-        eda.plot_distributions(df)
+        eda.show_value_counts(df)
         st.markdown("---")
-        eda.plot_categorical(df)
+        # Pass target if already selected in ML tab, else None
+        eda.show_mutual_information(df, target=st.session_state.get("ml_target"))
 
     with tab3:
         st.subheader("Machine Learning")
 
         if df is not None:
             target = st.selectbox("Select target variable", df.columns)
+            st.session_state["ml_target"] = target
             if target:
                 try:
                     # Preprocess (safe step: drops high-cardinality, splits X/y)
