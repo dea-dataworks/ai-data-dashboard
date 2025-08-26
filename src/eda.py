@@ -1,15 +1,9 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import streamlit as st
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
-
-# # Unique key helper: guarantees uniqueness even if a widget is created twice
-# def _unique_key(name: str) -> str:
-#     counter_key = f"__key_counter__{name}"
-#     idx = st.session_state.get(counter_key, 0)
-#     st.session_state[counter_key] = idx + 1
-#     return f"{name}_{idx}"
 
 # --- Schema / Snapshot panel ---
 def show_schema_panel(df: pd.DataFrame) -> None:
@@ -148,32 +142,4 @@ def show_value_counts(df: pd.DataFrame) -> None:
     col = st.selectbox("Select a categorical column", cat_cols, key="eda_show_value_counts_select")
     counts = df[col].value_counts(dropna=False).to_frame("count")
     st.dataframe(counts)
-
-# --- Mutual Information vs Target ---
-def show_mutual_information(df: pd.DataFrame, target: str | None = None) -> None:
-    st.subheader("Feature Relevance (Mutual Information)")
-    if target is None or target not in df.columns:
-        st.info("Select a target in the ML tab to compute mutual information.")
-        return
-
-    X = df.drop(columns=[target])
-    y = df[target]
-
-    # Only keep columns with usable dtypes
-    X = X.copy()
-    for col in X.select_dtypes(include=["object", "category"]).columns:
-        X[col] = X[col].astype("category")
-
-    try:
-        if pd.api.types.is_numeric_dtype(y) and y.nunique() > 20:
-            scores = mutual_info_regression(X, y, discrete_features="auto", random_state=42)
-        else:
-            scores = mutual_info_classif(X, y, discrete_features="auto", random_state=42)
-
-        mi = pd.Series(scores, index=X.columns).sort_values(ascending=False)
-        st.bar_chart(mi)
-
-        st.caption("Higher values = stronger dependency between feature and target.")
-    except Exception as e:
-        st.error(f"Could not compute mutual information: {e}")
 

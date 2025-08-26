@@ -84,15 +84,13 @@ if st.session_state.df is not None:
         eda.show_boxplot(df)
         st.markdown("---")
         eda.show_value_counts(df)
-        st.markdown("---")
-        # Pass target if already selected in ML tab, else None
-        eda.show_mutual_information(df, target=st.session_state.get("ml_target"))
 
     with tab3:
         st.subheader("Machine Learning")
 
         if df is not None:
             target = st.selectbox("Select target variable", df.columns)
+            # the target was saved when selected in the ML tab to be used in Mutual Information section of the EDA. Not being used right now.
             st.session_state["ml_target"] = target
             if target:
                 try:

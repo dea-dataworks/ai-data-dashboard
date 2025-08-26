@@ -10,7 +10,6 @@
 
 ### Phase 2 — Outliers & quick relationships
 - Boxplot for numeric; value counts (top‑N) for categorical.
-- (Stretch) Mutual information vs target.
 
 ### Phase 3 — Data quality warnings
 - Duplicates count; leakage checks (feature == target; |corr|≥0.95 numeric).
