@@ -12,7 +12,8 @@ from sklearn.metrics import (
      ConfusionMatrixDisplay, RocCurveDisplay
 )
 from sklearn.dummy import DummyClassifier, DummyRegressor
-
+from sklearn.model_selection import cross_val_score, StratifiedKFold, KFold
+from sklearn.metrics import make_scorer, f1_score
 
 
 def detect_task_type(y: pd.Series) -> str:
@@ -113,3 +114,56 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
 
     return {"task_type": task_type, "results": results, "y_test": y_test}
 
+
+def cross_validate_models(X: pd.DataFrame, y: pd.Series, cv_splits: int = 5) -> dict:
+    """Return mean±std metrics via 5-fold CV for the same model set."""
+    task_type = detect_task_type(y)
+    preprocessor = get_preprocessor(X)
+
+    results = {}
+    if task_type == "classification":
+        models = {
+            "Dummy Classifier": DummyClassifier(strategy="most_frequent"),
+            "Logistic Regression": LogisticRegression(max_iter=2000, random_state=42),
+            "Random Forest Classifier": RandomForestClassifier(n_estimators=100, random_state=42),
+        }
+        cv = StratifiedKFold(n_splits=cv_splits, shuffle=True, random_state=42)
+
+        for name, model in models.items():
+            pipe = Pipeline(steps=[('preprocessor', preprocessor), ('classifier', model)])
+            acc = cross_val_score(pipe, X, y, cv=cv, scoring="accuracy")
+            f1w = cross_val_score(pipe, X, y, cv=cv, scoring=make_scorer(f1_score, average="weighted"))
+            # ROC AUC only if binary
+            roc = None
+            if y.nunique() == 2:
+                try:
+                    roc = cross_val_score(pipe, X, y, cv=cv, scoring="roc_auc")
+                except Exception:
+                    roc = None
+            results[name] = {
+                "accuracy_mean": acc.mean(), "accuracy_std": acc.std(),
+                "f1_mean": f1w.mean(), "f1_std": f1w.std(),
+                "roc_auc_mean": (roc.mean() if roc is not None else None),
+                "roc_auc_std":  (roc.std()  if roc is not None else None),
+            }
+
+    else:  # regression
+        models = {
+            "Dummy Regressor": DummyRegressor(strategy="mean"),
+            "Linear Regression": LinearRegression(),
+            "Random Forest Regressor": RandomForestRegressor(n_estimators=100, random_state=42),
+        }
+        cv = KFold(n_splits=cv_splits, shuffle=True, random_state=42)
+
+        for name, model in models.items():
+            pipe = Pipeline(steps=[('preprocessor', preprocessor), ('regressor', model)])
+            r2  = cross_val_score(pipe, X, y, cv=cv, scoring="r2")
+            mae = cross_val_score(pipe, X, y, cv=cv, scoring="neg_mean_absolute_error")
+            rmse= cross_val_score(pipe, X, y, cv=cv, scoring="neg_root_mean_squared_error")
+            results[name] = {
+                "r2_mean": r2.mean(), "r2_std": r2.std(),
+                "mae_mean": (-mae.mean()), "mae_std": mae.std(),
+                "rmse_mean": (-rmse.mean()), "rmse_std": rmse.std(),
+            }
+
+    return {"task_type": task_type, "results": results}
