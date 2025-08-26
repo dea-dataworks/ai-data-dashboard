@@ -1,7 +1,9 @@
 # src/utils.py
 from __future__ import annotations
 import pandas as pd
-from io import StringIO
+from datetime import datetime
+from io import StringIO, BytesIO
+import streamlit as st
 
 from .data_preprocess import preprocess_df
 from .ml_models import train_and_evaluate
@@ -175,3 +177,56 @@ def plot_feature_importances(importances: dict, top_n: int = 10):
     ax.set_title(f"Top {top_n} Features (Random Forest)")
     plt.gca().invert_yaxis()
     return fig
+
+# ---------- Exporting utility ----------
+def _ts():
+    return datetime.now().strftime("%Y%m%d_%H%M")
+
+def _slugify(s: str) -> str:
+    return "".join(c.lower() if c.isalnum() else "-" for c in s).strip("-")
+
+def df_download_buttons(title: str, df: pd.DataFrame, base: str = "dashboard"):
+    """Show CSV + Excel download buttons for a DataFrame."""
+    if df is None or df.empty:
+        return
+    name = f"{_slugify(base)}-{_slugify(title)}-{_ts()}"
+
+    # CSV
+    csv_bytes = df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        f"⬇️ Download {title} (CSV)",
+        data=csv_bytes,
+        file_name=f"{name}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+    # Excel
+    xbuf = BytesIO()
+    with pd.ExcelWriter(xbuf, engine="openpyxl") as writer:
+        sheet = _slugify(title)[:28] or "data"
+        df.to_excel(writer, index=False, sheet_name=sheet)
+    xbuf.seek(0)
+    st.download_button(
+        f"⬇️ Download {title} (Excel)",
+        data=xbuf,
+        file_name=f"{name}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+
+def fig_download_button(title: str, fig, base: str = "dashboard", dpi: int = 150):
+    """Show a PNG download button for a Matplotlib figure."""
+    if fig is None:
+        return
+    name = f"{_slugify(base)}-{_slugify(title)}-{_ts()}.png"
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
+    buf.seek(0)
+    st.download_button(
+        f"🖼️ Download {title} (PNG)",
+        data=buf,
+        file_name=name,
+        mime="image/png",
+        use_container_width=True
+    )

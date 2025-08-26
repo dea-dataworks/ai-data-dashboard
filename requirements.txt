@@ -13,3 +13,6 @@ langchain-ollama==0.1.*
 
 PyYAML
 typing-extensions
+
+openpyxl>=3.1
+
