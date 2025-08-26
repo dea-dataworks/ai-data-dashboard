@@ -84,6 +84,8 @@ if st.session_state.df is not None:
         eda.show_boxplot(df)
         st.markdown("---")
         eda.show_value_counts(df)
+        st.markdown("---")
+        eda.show_data_quality_warnings(df, target=st.session_state.get("ml_target"))
 
     with tab3:
         st.subheader("Machine Learning")

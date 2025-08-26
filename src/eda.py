@@ -143,3 +143,36 @@ def show_value_counts(df: pd.DataFrame) -> None:
     counts = df[col].value_counts(dropna=False).to_frame("count")
     st.dataframe(counts)
 
+
+# --- Data quality warnings: Duplicates count, leakage checks (feature == target,|corr|≥0.95 numeric) ---
+def show_data_quality_warnings(df: pd.DataFrame, target: str | None = None) -> None:
+    st.subheader("Data Quality Warnings")
+
+    issues = []
+
+    # Duplicate rows
+    dup_count = df.duplicated().sum()
+    if dup_count > 0:
+        issues.append(f"⚠️ Found {dup_count} duplicate rows.")
+
+    # Target leakage: identical columns
+    if target and target in df.columns:
+        for col in df.columns:
+            if col != target and df[col].equals(df[target]):
+                issues.append(f"⚠️ Column **{col}** is identical to target **{target}**.")
+
+    # High correlation with target (numeric only)
+    if target and target in df.columns:
+        if pd.api.types.is_numeric_dtype(df[target]):
+            corr = df.corr(numeric_only=True)
+            if target in corr.columns:
+                high_corr = corr[target].drop(target).abs()
+                suspicious = high_corr[high_corr >= 0.95]
+                for col, val in suspicious.items():
+                    issues.append(f"⚠️ Column **{col}** is highly correlated with target (r={val:.2f}).")
+
+    if issues:
+        for msg in issues:
+            st.warning(msg)
+    else:
+        st.success("No major data quality issues detected.")

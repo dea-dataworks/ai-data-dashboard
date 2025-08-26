@@ -4,7 +4,7 @@
 ### Phase 0 — Repo sanity ✅
 - Move modules to `src/`, add `__init__.py`, update `.gitignore`.
 
-### Phase 1 — EDA Schema Panel (current)
+### Phase 1 — EDA Schema Panel 
 - Snapshot: numeric/categorical/datetime/bool counts, memory, % missing overall.
 - Top‑5 high‑cardinality text columns.
 
@@ -30,4 +30,5 @@
 - Include importances summary; (stretch) provider toggle.
 
 ### Phase 9 — README polish + release
+- Polish visuals (consistent colors, layout, font sizes)
 - GIFs, screenshots, client value section; tag v0.2.0.
