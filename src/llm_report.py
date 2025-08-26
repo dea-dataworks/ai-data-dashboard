@@ -2,13 +2,27 @@ from typing import Dict, Any, Optional, List
 import numpy as np
 import pandas as pd
 
+import os
 from langchain.prompts import PromptTemplate
-from langchain_ollama import OllamaLLM
 from langchain_core.output_parsers import StrOutputParser
 
 import streamlit as st
 from typing import Optional
 from src.utils import run_models
+from langchain_ollama import OllamaLLM
+try:
+    from langchain_openai import ChatOpenAI
+    _OPENAI_OK = True
+except Exception:
+    _OPENAI_OK = False
+
+# ---- Safe helper: get OpenAI key without crashing when secrets.toml is missing
+def _get_openai_key() -> str | None:
+    try:
+        # st.secrets raises if no secrets file exists; guard it
+        return st.secrets["OPENAI_API_KEY"]  # type: ignore[index]
+    except Exception:
+        return os.getenv("OPENAI_API_KEY")
 
 # ---------- Utilities to format data for the prompt ----------
 
@@ -97,6 +111,8 @@ def llm_report_tab(
     llm_model_name: str = "mistral",
     models_table_md: Optional[str] = None,
     top_k_corr: int = 10,
+    excluded_columns: Optional[list[str]] = None,
+    llm=None,
 ) -> str:
     """
     Build a structured, factual report using a Runnable pipeline (prompt | llm | StrOutputParser).
@@ -182,6 +198,10 @@ def llm_report_tab(
 
             {models_table_md}
 
+            ## Data Notes
+            - Excluded columns (user selection): 
+            {excluded_note}
+
             ## Recommendations
             Provide 4–6 concrete steps tailored to this dataset. Be specific (what to impute, what to drop, what to engineer, how to validate).
             """
@@ -191,7 +211,7 @@ def llm_report_tab(
         input_variables=[
             "dataset_name", "shape", "column_types", "sample_columns", "target", 
             "class_balance", "missing_values", "correlations", "feature_importances",
-            "model_list", "model_metrics", "recommendations", "models_table_md"
+            "model_list", "model_metrics", "recommendations", "models_table_md", "excluded_note"
         ],
     )
 
@@ -199,11 +219,9 @@ def llm_report_tab(
     inputs = {
         "dataset_name": dataset_name,
         "models_table_md": models_table_md or "Not run.",
-        #"shape": str(shape),
         "shape": _shape_pretty(df),
         "column_types": _fmt_dict(col_types, max_items=50),
         "sample_columns": _key_vars_human(df),
-        #"sample_columns": ", ".join(sample_columns[:7]) if sample_columns else "not available", 
         "target": target or "not specified",
         "class_balance": _fmt_dict(class_balance, max_items=20) if class_balance else "not available",
         "missing_values": _fmt_dict(missing_vals, max_items=50) if missing_vals else "no missing values",
@@ -212,14 +230,19 @@ def llm_report_tab(
         "model_list": ", ".join(model_list) if model_list else "not available",
         "model_metrics": model_metrics_str if model_metrics else "not available",
         "recommendations": recommendations,
-    }
-
+        "excluded_note": (", ".join(excluded_columns) if excluded_columns else "None"),
+     }
+    
     # ---- Runnable pipeline: prompt | llm | StrOutputParser ----
-    llm = OllamaLLM(model=llm_model_name)
+    llm = llm or OllamaLLM(model=llm_model_name)
     chain = prompt | llm | StrOutputParser()
 
-    report: str = chain.invoke(inputs)
-    return report
+    try:
+        report: str = chain.invoke(inputs)
+        return report
+    except Exception as e:
+        # Normalize provider errors so the caller can show a clean message
+        raise RuntimeError(str(e)) from e
 
 def _format_model_metrics(models_output: dict | None) -> str:
     """
@@ -256,7 +279,6 @@ def _format_model_metrics(models_output: dict | None) -> str:
 
     return "\n".join(lines)
 
-
 def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
     """Streamlit UI for the LLM Report tab."""
     st.subheader("LLM Report Generation")
@@ -269,16 +291,167 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
 
     target: Optional[str] = None
     model_metrics = None
-    feature_importances = None  # (optional later)
 
+    feature_importances = None  # will be filled from RF if available
+    rf_top_k = st.number_input("Top-N RF features to include", min_value=3, max_value=30, value=10, step=1)
+
+    # --- Provider & Model selection ---
+    openai_key = _get_openai_key()
+    openai_available = bool(_OPENAI_OK and openai_key)
+
+    provider_help = None if openai_available else (
+    "OpenAI disabled (missing package or API key). Select Ollama, "
+    "or install `langchain_openai` and set OPENAI_API_KEY."
+    )
+
+    # if not (_OPENAI_OK and openai_key):
+    #     provider_help = "OpenAI disabled (missing package or API key). Select Ollama, or install `langchain_openai` and set OPENAI_API_KEY."
+
+    provider = st.sidebar.radio("LLM Provider", ["Ollama", "OpenAI"],index=0,help=provider_help)
+
+    # Default model names
+    ollama_model = "mistral"
+    openai_model = "gpt-4o-mini"
+
+    # If user picked OpenAI but it isn't available, force fallback
+    if provider == "OpenAI" and not openai_available:
+        st.sidebar.error("OpenAI is not configured; falling back to **Ollama**.")
+        provider = "Ollama"
+
+    # Show ONLY the active provider's model picker
+    if provider == "Ollama":
+        ollama_model = st.sidebar.selectbox("Ollama model", options=["mistral"], index=0)
+    else:
+        openai_models = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"]
+        openai_model = st.sidebar.selectbox("OpenAI model", options=openai_models, index=0)
+
+
+    # # Show ONLY the active provider's model picker
+    # if provider == "Ollama":
+    #     # Fixed choice: mistral (no typing, no autodetect)
+    #     ollama_model = st.sidebar.selectbox("Ollama model", options=["mistral"], index=0)
+    #     openai_model = "gpt-4o-mini"  # placeholder; not used
+    # else:
+    #     openai_models = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"]
+    #     if _OPENAI_OK and openai_key:
+    #         openai_model = st.sidebar.selectbox("OpenAI model", options=openai_models, index=0)
+    #     else:
+    #         st.sidebar.selectbox("OpenAI model", options=openai_models, index=0, disabled=True, key="openai_model_disabled")
+    #         st.sidebar.info("OpenAI unavailable. Install `langchain_openai` and set OPENAI_API_KEY.")
+    #     ollama_model = "mistral"  # placeholder; not used
+   
+    active_model = openai_model if provider == "OpenAI" else ollama_model
+    st.caption(f"Provider: **{provider}** · Model: **{active_model}**")
+
+    # LLM factory with graceful fallback + quota guard
+    def make_llm(provider_choice: str):
+        if provider_choice == "OpenAI":
+            if not openai_available:
+                raise RuntimeError("OpenAI not configured. Install `langchain_openai` and set `OPENAI_API_KEY`.")
+            return ChatOpenAI(model=openai_model, temperature=0.2)
+        # Ollama path
+        return OllamaLLM(model=ollama_model)
+
+    # def make_llm(provider_choice: str):
+    #     if provider_choice == "OpenAI":
+    #         if not (_OPENAI_OK and _get_openai_key()):
+    #             raise RuntimeError(
+    #                 "OpenAI not configured. Install `langchain_openai` and set `OPENAI_API_KEY`."
+    #             )
+    #         try:
+    #             return ChatOpenAI(model=openai_model, temperature=0.2)
+    #         except Exception as e:
+    #             # Bubble up (handled by caller)
+    #             raise RuntimeError(f"OpenAI error: {e}")
+    #     else:  # Ollama
+    #         try:
+    #             return OllamaLLM(model=ollama_model)
+    #         except Exception as e:
+    #             raise RuntimeError(
+    #                 "Ollama not available or model `mistral` not pulled. "
+    #                 "Install Ollama and run: `ollama pull mistral`."
+    #             ) from e
+   
     if include_modeling:
         # Let user choose the target
         target = st.selectbox("Select target column", options=list(df.columns))
         st.caption("Tip: choose your label column for classification/regression.")
-
+     
+    
+    # Generate Report
     models_table_md = ""
+    report_text = None
+
     if st.button("Generate Report"):
         with st.spinner("Analyzing dataset with AI..."):
+            # (A) If modeling requested, run it FIRST to build metrics + RF importances
+            if include_modeling and target:
+                out = run_models(df, target)  # returns task_type, results, text_summary
+                models_table_md = _format_model_metrics(out)
+
+                # Build compact metrics dict for the prompt
+                metrics_dict = {}
+                if out["task_type"] == "classification":
+                    for model, m in out["results"].items():
+                        metrics_dict[model] = {
+                            "accuracy": round(m.get("accuracy", float("nan")), 3),
+                            "f1_weighted": round(m.get("f1_score", float("nan")), 3),
+                            "roc_auc": (round(m["roc_auc"], 3) if m.get("roc_auc") is not None else "na"),
+                        }
+                else:
+                    for model, m in out["results"].items():
+                        metrics_dict[model] = {
+                            "r2": round(m.get("r2_score", float("nan")), 3),
+                            "mae": round(m.get("mae", float("nan")), 3),
+                            "rmse": round(m.get("rmse", float("nan")), 3),
+                        }
+                model_metrics = metrics_dict
+
+                # RF importances (first RF found)
+                rf_importances = {}
+                for model_name, m in out["results"].items():
+                    imp = m.get("feature_importances", {})
+                    if isinstance(imp, dict) and imp and "Random Forest" in model_name:
+                        rf_importances = dict(sorted(imp.items(), key=lambda x: x[1], reverse=True)[:rf_top_k])
+                        break
+                feature_importances = rf_importances or None
+
+            # (B) Build the LLM and generate the report, with clean provider-specific errors
+            try:
+                llm = make_llm(provider)  # strict: no cross-provider fallback
+                report_text = llm_report_tab(
+                    df=df,
+                    dataset_name=dataset_name or "Dataset",
+                    target=target,
+                    model_metrics=model_metrics,
+                    feature_importances=feature_importances,
+                    llm_model_name="mistral",  # only used if llm is None
+                    top_k_corr=10,
+                    models_table_md=models_table_md,
+                    excluded_columns=st.session_state.get("ml_excluded_cols", []),
+                    llm=llm,
+                )
+                st.subheader("Generated Report")
+                st.markdown(report_text)
+                st.download_button(
+                    label="Download report (Markdown)",
+                    data=report_text.encode("utf-8"),
+                    file_name=f"{dataset_name or 'dataset'}_report.md",
+                    mime="text/markdown"
+                )
+
+            except Exception as ex:
+                msg = str(ex)
+                if "insufficient_quota" in msg or "You exceeded your current quota" in msg:
+                    st.error("OpenAI quota exceeded. Add credits to your account or switch provider to **Ollama**.")
+                elif "OpenAI not configured" in msg or "langchain_openai" in msg:
+                    st.error("OpenAI is not configured. Install `langchain_openai` and set `OPENAI_API_KEY`.")
+                elif "Ollama not available" in msg or "mistral" in msg:
+                    st.error("Ollama not installed or model `mistral` not pulled. Run: `ollama pull mistral`.")
+                else:
+                    st.error(f"Report generation failed: {msg}")
+
+
             # If modeling requested and target chosen, run models to get metrics text
             if include_modeling and target:
                 out = run_models(df, target)  # returns task_type, results, text_summary
@@ -302,33 +475,33 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
                         }
                 model_metrics = metrics_dict
 
-            # Build the narrative using the existing function
-            try:
-                report_text = llm_report_tab(
-                    df=df,
-                    dataset_name=dataset_name or "Dataset",
-                    target=target,
-                    model_metrics=model_metrics,
-                    feature_importances=feature_importances,
-                    llm_model_name="mistral",
-                    top_k_corr=10,
-                    # NEW
-                    models_table_md=models_table_md,
-                )
-            except Exception as e:
-                st.error(
-                    "LLM Report requires Ollama + Mistral.\n"
-                    "Install Ollama and run: `ollama pull mistral`.\n"
-                    f"Original error: {e}"
-                )
-                return
+                # ---- Extract RF importances for the prompt (first RF with data) ----
+                rf_importances = {}
+                for model_name, m in out["results"].items():
+                    imp = m.get("feature_importances", {})
+                    if isinstance(imp, dict) and len(imp) > 0 and "Random Forest" in model_name:
+                        rf_importances = dict(sorted(imp.items(), key=lambda x: x[1], reverse=True)[:rf_top_k])
+                        break
+                feature_importances = rf_importances or None
 
-            st.subheader("Generated Report")
-            st.markdown(report_text)
-
-            st.download_button(
-                label="Download report (Markdown)",
-                data=report_text.encode("utf-8"),
-                file_name=f"{dataset_name or 'dataset'}_report.md",
-                mime="text/markdown"
-            )
+                # if "insufficient_quota" in msg or "You exceeded your current quota" in msg:
+                #     st.error(
+                #         "OpenAI quota exceeded. Add credits to your OpenAI account or switch the provider to **Ollama**."
+                #     )
+                # # OpenAI not configured
+                # elif "OpenAI not configured" in msg:
+                #     st.error("OpenAI is not configured. Install `langchain_openai` and set `OPENAI_API_KEY`.")
+                # # Ollama missing / mistral not pulled
+                # elif "Ollama not available" in msg or "mistral" in msg:
+                #     st.error("Ollama not installed or `mistral` not pulled. Run: `ollama pull mistral`.")
+                # else:
+                #     st.error(f"Report generation failed: {msg}")
+            if report_text:
+                st.subheader("Generated Report")
+                st.markdown(report_text)
+                st.download_button(
+                    label="Download report (Markdown)",
+                    data=report_text.encode("utf-8"),
+                    file_name=f"{dataset_name or 'dataset'}_report.md",
+                    mime="text/markdown"
+                )
