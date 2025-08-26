@@ -97,10 +97,18 @@ if st.session_state.df is not None:
             target = st.selectbox("Select target variable", df.columns)
             # the target was saved when selected in the ML tab to be used in Mutual Information section of the EDA. Not being used right now.
             st.session_state["ml_target"] = target
+
+            # the option to exclude columns from modeling (e.g. IDs, free text, obvious leakage)
+            all_features = [c for c in df.columns if c != target]
+            exclude_cols = st.multiselect("Exclude columns from modeling (e.g., IDs, free text, obvious leakage)",
+                                          options=all_features, 
+                                          key="ml_exclude_cols")
+
             if target:
                 try:
                     # Preprocess (safe step: drops high-cardinality, splits X/y)
-                    X, y = data_preprocess.preprocess_df(df, target)
+                    X, y = data_preprocess.preprocess_df(df, target, exclude=exclude_cols)
+                    st.session_state["ml_excluded_cols"] = exclude_cols
 
                     # toggle to choose to use k fold cross validation
                     use_cv = st.checkbox("Use 5-fold cross-validation (metrics only)", value=False, key="ml_use_cv")
@@ -311,6 +319,10 @@ if st.session_state.df is not None:
             df,
             default_name=st.session_state.get("dataset_name", "Dataset")
         )
+        # this will mention the columns that the user discarded
+        excluded_cols = st.session_state.get("ml_excluded_cols", [])
+        if excluded_cols:
+            st.caption(f"⚠️ The following columns were excluded from modeling: {', '.join(excluded_cols)}")
 
 # --- Reset Button Section ---
 # Add reset button at the bottom, only if a file has been processed

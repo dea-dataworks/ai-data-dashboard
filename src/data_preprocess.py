@@ -1,6 +1,6 @@
 import pandas as pd
 
-def preprocess_df(df: pd.DataFrame, target: str):
+def preprocess_df(df: pd.DataFrame, target: str, exclude: list[str] | None = None):
     """
     Performs initial preprocessing: drops high-cardinality columns
     and splits features/target. Further preprocessing (imputation,
@@ -17,6 +17,10 @@ def preprocess_df(df: pd.DataFrame, target: str):
         raise ValueError(f"Target column '{target}' not found in DataFrame.")
 
     df = df.copy()
+
+    # Drop user-specified exclusions
+    if exclude:
+        df.drop(columns=[c for c in exclude if c in df.columns], inplace=True)
 
     # Drop high-cardinality object columns (heuristic >30 unique values)
     high_card_cols = [
