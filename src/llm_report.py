@@ -304,9 +304,6 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
     "or install `langchain_openai` and set OPENAI_API_KEY."
     )
 
-    # if not (_OPENAI_OK and openai_key):
-    #     provider_help = "OpenAI disabled (missing package or API key). Select Ollama, or install `langchain_openai` and set OPENAI_API_KEY."
-
     provider = st.sidebar.radio("LLM Provider", ["Ollama", "OpenAI"],index=0,help=provider_help)
 
     # Default model names
@@ -324,21 +321,6 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
     else:
         openai_models = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"]
         openai_model = st.sidebar.selectbox("OpenAI model", options=openai_models, index=0)
-
-
-    # # Show ONLY the active provider's model picker
-    # if provider == "Ollama":
-    #     # Fixed choice: mistral (no typing, no autodetect)
-    #     ollama_model = st.sidebar.selectbox("Ollama model", options=["mistral"], index=0)
-    #     openai_model = "gpt-4o-mini"  # placeholder; not used
-    # else:
-    #     openai_models = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"]
-    #     if _OPENAI_OK and openai_key:
-    #         openai_model = st.sidebar.selectbox("OpenAI model", options=openai_models, index=0)
-    #     else:
-    #         st.sidebar.selectbox("OpenAI model", options=openai_models, index=0, disabled=True, key="openai_model_disabled")
-    #         st.sidebar.info("OpenAI unavailable. Install `langchain_openai` and set OPENAI_API_KEY.")
-    #     ollama_model = "mistral"  # placeholder; not used
    
     active_model = openai_model if provider == "OpenAI" else ollama_model
     st.caption(f"Provider: **{provider}** · Model: **{active_model}**")
@@ -351,26 +333,6 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
             return ChatOpenAI(model=openai_model, temperature=0.2)
         # Ollama path
         return OllamaLLM(model=ollama_model)
-
-    # def make_llm(provider_choice: str):
-    #     if provider_choice == "OpenAI":
-    #         if not (_OPENAI_OK and _get_openai_key()):
-    #             raise RuntimeError(
-    #                 "OpenAI not configured. Install `langchain_openai` and set `OPENAI_API_KEY`."
-    #             )
-    #         try:
-    #             return ChatOpenAI(model=openai_model, temperature=0.2)
-    #         except Exception as e:
-    #             # Bubble up (handled by caller)
-    #             raise RuntimeError(f"OpenAI error: {e}")
-    #     else:  # Ollama
-    #         try:
-    #             return OllamaLLM(model=ollama_model)
-    #         except Exception as e:
-    #             raise RuntimeError(
-    #                 "Ollama not available or model `mistral` not pulled. "
-    #                 "Install Ollama and run: `ollama pull mistral`."
-    #             ) from e
    
     if include_modeling:
         # Let user choose the target
@@ -484,18 +446,7 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
                         break
                 feature_importances = rf_importances or None
 
-                # if "insufficient_quota" in msg or "You exceeded your current quota" in msg:
-                #     st.error(
-                #         "OpenAI quota exceeded. Add credits to your OpenAI account or switch the provider to **Ollama**."
-                #     )
-                # # OpenAI not configured
-                # elif "OpenAI not configured" in msg:
-                #     st.error("OpenAI is not configured. Install `langchain_openai` and set `OPENAI_API_KEY`.")
-                # # Ollama missing / mistral not pulled
-                # elif "Ollama not available" in msg or "mistral" in msg:
-                #     st.error("Ollama not installed or `mistral` not pulled. Run: `ollama pull mistral`.")
-                # else:
-                #     st.error(f"Report generation failed: {msg}")
+                
             if report_text:
                 st.subheader("Generated Report")
                 st.markdown(report_text)

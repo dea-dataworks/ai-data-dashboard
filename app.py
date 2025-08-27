@@ -21,8 +21,16 @@ import src.llm_report as llm_report
 from src.utils import df_download_buttons, fig_download_button
 
 # Set page configuration
-st.set_page_config(page_title="AI Data Insight Dashboard", layout="centered")
+st.set_page_config(page_title="AI Data Insight Dashboard", layout="wide")
 st.title("AI Data Insight Dashboard")
+
+# --- Sidebar: Global Settings ---
+with st.sidebar:
+    st.header("Global Settings")
+    st.session_state["compact_mode"] = st.checkbox("Compact mode (smaller plots, tighter layout)", value=False)
+    st.session_state["collapse_plots"] = st.checkbox("Collapse plots by default", value=False)
+    st.session_state["global_seed"] = st.number_input("Random seed", min_value=0, value=42, step=1)
+    st.session_state["cv_folds"] = st.number_input("CV folds", min_value=2, max_value=10, value=5, step=1)
 
 # Function to reset the application 
 def reset_app():
@@ -67,7 +75,7 @@ if st.session_state.df is not None:
     with tab1:
         st.subheader("Dataset Preview")
         st.write(f"Shape: {df.shape[0]} rows x {df.shape[1]} columns")
-        st.dataframe(df.head())
+        st.dataframe(df.head(10))
 
     with tab2:
         st.subheader("Exploratory Data Analysis")
