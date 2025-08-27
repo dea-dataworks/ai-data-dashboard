@@ -1,9 +1,108 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import seaborn as sns
 import streamlit as st
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
+from matplotlib import font_manager as fm, rcParams
+from pathlib import Path
+
+
+# ---- Font ----
+f = Path(__file__).resolve().parent / "fonts" / "Inter-VariableFont_opsz,wght.ttf"
+FONT_STACK = ["DejaVu Sans"]
+if f.exists():
+    fm.fontManager.addfont(str(f))
+    family = fm.FontProperties(fname=str(f)).get_name()  # typically "Inter"
+    FONT_STACK = [family, "DejaVu Sans"]
+
+mpl.rcParams.update({"font.family": FONT_STACK, "axes.titleweight": "semibold"})
+
+# Alternative colors:
+# palette: tableau
+_TABLEAU10 = ["#4E79A7","#F28E2B","#E15759","#76B7B2","#59A14F",
+              "#EDC948","#B07AA1","#FF9DA7","#9C755F","#BAB0AC"]
+
+# palette: professional"
+_PRO_PAL = ["#556EE6", "#23A699", "#E66E55", "#8B77AA", "#C3A634", "#3E4C59", "#9AA5B1"]
+
+# --- Global Dashboard Theme: Main accent color for all plots (hist bars, boxplots, bar charts, etc.) 
+DASHBOARD_COLOR ="#9AA5B1"  
+DASHBOARD_COLOR =_PRO_PAL[-1]
+
+# # Apply globally
+# rcParams["font.family"] = [family_name, "DejaVu Sans"]
+# rcParams["axes.titleweight"] = "semibold"
+
+def _is_dark_theme() -> bool:
+    try:
+        return (st.get_option("theme.base") or "").lower() == "dark"
+    except Exception:
+        return False
+
+def get_style_params(compact: bool):
+    return {
+        "figsize": (6.5, 3.6) if compact else (8.8, 4.8),
+        "dpi": 120,
+        "title_fs": 12 if compact else 14,
+        "label_fs": 10 if compact else 12,
+        "tick_fs": 9 if compact else 10,
+        "lw": 1.1 if compact else 1.3,
+        "bins": 15 if compact else 30,
+        "cmap": "viridis",
+        "main_color": DASHBOARD_COLOR,
+        "axes_face": "#22262e" if _is_dark_theme() else "#FAFAFA",
+        "spine_color": "#9AA1AA" if _is_dark_theme() else "#B0B7BF",
+        # bar look
+        "bar_alpha": 0.90,
+        "bar_edge_color": "#000000",
+        "bar_edge_width": 0.7 if compact else 0.8,
+    }
+
+class PlotStyle:
+    def __init__(self, compact: bool):
+        self.p = get_style_params(compact)
+        self._rc = None
+
+    def __enter__(self):
+        self._rc = mpl.rc_context({
+            "figure.dpi": self.p["dpi"],
+            "axes.titlesize": self.p["title_fs"],
+            "axes.labelsize": self.p["label_fs"],
+            "axes.facecolor": self.p["axes_face"],
+            "figure.facecolor": "white",
+            "savefig.facecolor": "white",
+            "xtick.labelsize": self.p["tick_fs"],
+            "ytick.labelsize": self.p["tick_fs"],
+            "font.family": FONT_STACK,
+        })
+        self._rc.__enter__()
+        return self
+
+    def __exit__(self, *exc):
+        self._rc.__exit__(*exc)
+
+def stylize_axes(ax, title=None, xlabel=None, ylabel=None, lw=1.3, grid_axis=None):
+    # grid_axis: "x", "y", "both", or None
+    if grid_axis:
+        ax.grid(axis=grid_axis, linestyle="--", alpha=0.22)
+    else:
+        ax.grid(False)
+
+    # spines
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_linewidth(0.8)
+
+    if title:  ax.set_title(title, pad=8)
+    if xlabel: ax.set_xlabel(xlabel, labelpad=6)
+    if ylabel: ax.set_ylabel(ylabel, labelpad=6)
+
+    for line in ax.lines:
+        line.set_linewidth(lw)
+
 
 # --- Schema / Snapshot panel ---
 def show_schema_panel(df: pd.DataFrame) -> None:
@@ -91,13 +190,31 @@ def show_correlation(df):
 
 # distributions for numerical
 def plot_distributions(df):
+    compact = st.session_state.get("compact_mode", False)
+    params = get_style_params(compact)
     st.subheader("Feature Distributions")
     st.write("This section allows you to visualize the distribution of numerical features using **histograms** and **Kernel Density Estimates (KDE)**. Histograms show the frequency of data points within specific bins, while KDE provides a smooth estimate of the data's probability density.")
     col = st.selectbox("Select a numeric column", df.select_dtypes(include=["int64", "float64"]).columns, key="eda_plot_distributions_numeric_select")
-    fig, ax = plt.subplots()
-    sns.histplot(df[col], bins=30, kde=True, ax=ax)
-    st.pyplot(fig)
-    plt.close(fig) 
+
+    fig, ax = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
+    with PlotStyle(compact):
+        ax.hist(
+            df[col].dropna(),
+            bins=params["bins"],
+            color=params["main_color"],                  
+            edgecolor=params["bar_edge_color"],          
+            linewidth=params["bar_edge_width"],
+            alpha=params["bar_alpha"]
+        )
+        stylize_axes(ax,
+                    title=f"Distribution — {col}",
+                    xlabel=col,
+                    ylabel="Count",
+                    lw=params["lw"],
+                    grid_axis=None)
+
+    st.pyplot(fig, use_container_width=False)
+    plt.close(fig)
 
 def plot_categorical(df):
     st.subheader("Categorical Feature Distribution")

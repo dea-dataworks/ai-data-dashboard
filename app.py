@@ -3,16 +3,7 @@ from pathlib import Path
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-
-# import eda
-# import ml_models as ml
-# import data_preprocess
-# from ml_models import train_and_evaluate
-# import llm_report 
-#from data_preprocess import preprocess_df
-
 import src.utils as utils
-
 import src.eda as eda
 import src.ml_models as ml
 from src import data_preprocess
@@ -20,6 +11,16 @@ from src.data_preprocess import preprocess_df
 from src.ml_models import train_and_evaluate
 import src.llm_report as llm_report
 from src.utils import df_download_buttons, fig_download_button
+
+
+import matplotlib as mpl
+from matplotlib import font_manager as fm
+
+fam = mpl.rcParams.get("font.family", ["sans-serif"])
+print("Font family set to:", fam)
+resolved = fm.FontProperties(family=fam).get_name()
+print("Matplotlib actually using:", resolved)
+
 
 # Set page configuration
 st.set_page_config(page_title="AI Data Insight Dashboard", layout="wide")
