@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import streamlit as st
 import pandas as pd
@@ -26,11 +27,13 @@ st.title("AI Data Insight Dashboard")
 
 # --- Sidebar: Global Settings ---
 with st.sidebar:
-    st.header("Global Settings")
-    st.session_state["compact_mode"] = st.checkbox("Compact mode (smaller plots, tighter layout)", value=False)
-    st.session_state["collapse_plots"] = st.checkbox("Collapse plots by default", value=False)
-    st.session_state["global_seed"] = st.number_input("Random seed", min_value=0, value=42, step=1)
-    st.session_state["cv_folds"] = st.number_input("CV folds", min_value=2, max_value=10, value=5, step=1)
+    # st.header("Global Settings")
+    # st.session_state["compact_mode"] = st.checkbox("Compact mode (smaller plots, tighter layout)", value=False)
+    # st.session_state["collapse_plots"] = st.checkbox("Collapse plots by default", value=False)
+    # st.session_state["global_seed"] = st.number_input("Random seed", min_value=0, value=42, step=1)
+    # st.session_state["cv_folds"] = st.number_input("CV folds", min_value=2, max_value=10, value=5, step=1)
+    utils.sidebar_global_settings()
+    utils.sidebar_llm_settings()
 
 # Function to reset the application 
 def reset_app():
@@ -366,7 +369,6 @@ if st.session_state.df is not None:
             df,
             default_name=st.session_state.get("dataset_name", "Dataset")
         )
-        # this will mention the columns that the user discarded
         excluded_cols = st.session_state.get("ml_excluded_cols", [])
         if excluded_cols:
             st.caption(f"⚠️ The following columns were excluded from modeling: {', '.join(excluded_cols)}")

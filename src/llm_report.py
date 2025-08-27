@@ -295,35 +295,21 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
     feature_importances = None  # will be filled from RF if available
     rf_top_k = st.number_input("Top-N RF features to include", min_value=3, max_value=30, value=10, step=1)
 
-    # --- Provider & Model selection ---
-    openai_key = _get_openai_key()
-    openai_available = bool(_OPENAI_OK and openai_key)
+    # --- Provider & model: read from unified sidebar (session_state), no UI here ---
+    provider = st.session_state.get("llm_provider", "Ollama")
+    ollama_model = st.session_state.get("ollama_model", "mistral")
+    openai_model = st.session_state.get("openai_model", "gpt-4o-mini")
+    openai_available = st.session_state.get("openai_available", False)
 
-    provider_help = None if openai_available else (
-    "OpenAI disabled (missing package or API key). Select Ollama, "
-    "or install `langchain_openai` and set OPENAI_API_KEY."
-    )
-
-    provider = st.sidebar.radio("LLM Provider", ["Ollama", "OpenAI"],index=0,help=provider_help)
-
-    # Default model names
-    ollama_model = "mistral"
-    openai_model = "gpt-4o-mini"
-
-    # If user picked OpenAI but it isn't available, force fallback
-    if provider == "OpenAI" and not openai_available:
-        st.sidebar.error("OpenAI is not configured; falling back to **Ollama**.")
-        provider = "Ollama"
-
-    # Show ONLY the active provider's model picker
-    if provider == "Ollama":
-        ollama_model = st.sidebar.selectbox("Ollama model", options=["mistral"], index=0)
-    else:
-        openai_models = ["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"]
-        openai_model = st.sidebar.selectbox("OpenAI model", options=openai_models, index=0)
-   
     active_model = openai_model if provider == "OpenAI" else ollama_model
     st.caption(f"Provider: **{provider}** · Model: **{active_model}**")
+
+    def make_llm(provider_choice: str):
+        if provider_choice == "OpenAI":
+            if not openai_available:
+                raise RuntimeError("OpenAI not configured. Install `langchain_openai` and set `OPENAI_API_KEY`.")
+            return ChatOpenAI(model=openai_model, temperature=0.2)
+        return OllamaLLM(model=ollama_model)
 
     # LLM factory with graceful fallback + quota guard
     def make_llm(provider_choice: str):

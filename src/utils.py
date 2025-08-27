@@ -1,5 +1,6 @@
 # src/utils.py
 from __future__ import annotations
+import os
 import pandas as pd
 from datetime import datetime
 from io import StringIO, BytesIO
@@ -230,3 +231,48 @@ def fig_download_button(title: str, fig, base: str = "dashboard", dpi: int = 150
         mime="image/png",
         use_container_width=True
     )
+
+# --- Sidebar Helpers ---
+def _openai_is_available() -> bool:
+    try:
+        from langchain_openai import ChatOpenAI  # noqa: F401
+        pkg_ok = True
+    except Exception:
+        pkg_ok = False
+    key = None
+    try:
+        key = st.secrets["OPENAI_API_KEY"]  # type: ignore[index]
+    except Exception:
+        key = os.getenv("OPENAI_API_KEY")
+    return bool(pkg_ok and key)
+
+def sidebar_global_settings():
+    st.header("⚙️ Global Settings")
+    st.session_state["compact_mode"] = st.checkbox("Compact mode (smaller plots, tighter layout)", value=False)
+    st.session_state["collapse_plots"] = st.checkbox("Collapse plots by default", value=False)
+    st.session_state["global_seed"] = st.number_input("Random seed", min_value=0, value=42, step=1)
+    st.session_state["cv_folds"] = st.number_input("CV folds", min_value=2, max_value=10, value=5, step=1)
+
+def sidebar_llm_settings():
+    st.subheader("🤖 LLM Provider")
+    openai_available = _openai_is_available()
+    help_txt = None if openai_available else (
+        "OpenAI disabled (missing package or API key). Install `langchain_openai` and set OPENAI_API_KEY."
+    )
+    provider = st.radio("Provider", ["Ollama", "OpenAI"], index=0, help=help_txt)
+    if provider == "OpenAI" and not openai_available:
+        st.warning("OpenAI is not configured; falling back to **Ollama**.")
+        provider = "Ollama"
+
+    if provider == "Ollama":
+        ollama_model = st.selectbox("Ollama model", options=["mistral"], index=0)
+        openai_model = "gpt-4o-mini"
+    else:
+        openai_model = st.selectbox("OpenAI model", options=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"], index=0)
+        ollama_model = "mistral"
+
+    # expose globally
+    st.session_state["llm_provider"] = provider
+    st.session_state["ollama_model"] = ollama_model
+    st.session_state["openai_model"] = openai_model
+    st.session_state["openai_available"] = openai_available
