@@ -27,13 +27,11 @@ _TABLEAU10 = ["#4E79A7","#F28E2B","#E15759","#76B7B2","#59A14F",
 # palette: professional"
 _PRO_PAL = ["#556EE6", "#23A699", "#E66E55", "#8B77AA", "#C3A634", "#3E4C59", "#9AA5B1"]
 
-# --- Global Dashboard Theme: Main accent color for all plots (hist bars, boxplots, bar charts, etc.) 
-DASHBOARD_COLOR ="#9AA5B1"  
-DASHBOARD_COLOR =_PRO_PAL[-1]
+# grays and blues
+grays_blues = ["#9AA5B1", "#4A90E2", "#2F5597", "#5B9BD5"]
 
-# # Apply globally
-# rcParams["font.family"] = [family_name, "DejaVu Sans"]
-# rcParams["axes.titleweight"] = "semibold"
+# --- Global Dashboard Theme: Main accent color for all plots (hist bars, boxplots, bar charts, etc.) 
+DASHBOARD_COLOR ="#5B9BD5"
 
 def _is_dark_theme() -> bool:
     try:
@@ -50,11 +48,10 @@ def get_style_params(compact: bool):
         "tick_fs": 9 if compact else 10,
         "lw": 1.1 if compact else 1.3,
         "bins": 15 if compact else 30,
-        "cmap": "viridis",
+        "cmap": "Blues",
         "main_color": DASHBOARD_COLOR,
         "axes_face": "#22262e" if _is_dark_theme() else "#FAFAFA",
         "spine_color": "#9AA1AA" if _is_dark_theme() else "#B0B7BF",
-        # bar look
         "bar_alpha": 0.90,
         "bar_edge_color": "#000000",
         "bar_edge_width": 0.7 if compact else 0.8,
@@ -182,11 +179,46 @@ def show_missing(df):
 # correlation
 def show_correlation(df):
     st.subheader("Correlation Heatmap")
-    st.write("This heatmap visualizes the **correlation coefficients** between numerical features in your dataset. Values closer to **1** (red) indicate a strong positive correlation, values closer to **-1** (blue) indicate a strong negative correlation, and values near **0** (white/light colors) indicate a weak or no linear correlation.")
+    st.write(
+        "This heatmap visualizes the **correlation coefficients** between numerical features. "
+        "Values close to **1** indicate strong positive correlation; **-1** strong negative."
+    )
+
     corr = df.corr(numeric_only=True)
-    fig, ax = plt.subplots()
-    sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
-    st.pyplot(fig)
+    if corr.empty:
+        st.info("No numerical columns to correlate.")
+        return
+
+    compact = st.session_state.get("compact_mode", False)
+    params = get_style_params(compact)
+
+    with PlotStyle(compact):
+        fig, ax = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
+        sns.heatmap(
+            corr,
+            ax=ax,
+            annot=True,
+            fmt=".2f",
+            cmap=params["cmap"],        # unified palette
+            cbar=True,
+            linewidths=0.3,
+            linecolor="#00000010",
+            square=False
+        )
+        stylize_axes(
+            ax,
+            title="Correlation Heatmap",
+            xlabel=None,
+            ylabel=None,
+            lw=params["lw"],
+            grid_axis=None
+        )
+        # Make tick labels a touch smaller/tilted for compactness
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+
+        st.pyplot(fig, use_container_width=False)
+        plt.close(fig)
 
 # distributions for numerical
 def plot_distributions(df):
@@ -211,30 +243,50 @@ def plot_distributions(df):
                     xlabel=col,
                     ylabel="Count",
                     lw=params["lw"],
-                    grid_axis=None)
+                    grid_axis="y")
 
     st.pyplot(fig, use_container_width=False)
     plt.close(fig)
 
 def plot_categorical(df):
     st.subheader("Categorical Feature Distribution")
-    st.write("This section visualizes the distribution of categorical features with **less than 20 unique values**. Each bar shows the count of occurrences for a specific category.")
+    st.write("Counts for categorical features with **< 20 unique values**.")
 
     cat_cols = df.select_dtypes(include=["object", "category"]).columns
-    plottable_cat_cols = []
+    plottable_cat_cols = [c for c in cat_cols if df[c].nunique(dropna=False) < 20]
 
-    for col in cat_cols:
-        if df[col].nunique() < 20:
-            plottable_cat_cols.append(col)
-
-    if len(plottable_cat_cols) > 0:
-        col = st.selectbox("Select a categorical column", plottable_cat_cols, key="eda_plot_categorical_select")
-        fig, ax = plt.subplots()
-        df[col].value_counts().plot(kind="bar", ax=ax)
-        ax.set_ylabel("Count")
-        st.pyplot(fig)
-    else:
+    if not plottable_cat_cols:
         st.info("No categorical columns detected.")
+        return
+
+    col = st.selectbox("Select a categorical column", plottable_cat_cols, key="eda_plot_categorical_select")
+
+    compact = st.session_state.get("compact_mode", False)
+    params = get_style_params(compact)
+
+    counts = df[col].value_counts(dropna=False)
+
+    with PlotStyle(compact):
+        fig, ax = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
+        ax.bar(
+            counts.index.astype(str),
+            counts.values,
+            color=params["main_color"],
+            edgecolor=params["bar_edge_color"],
+            linewidth=params["bar_edge_width"],
+            alpha=params["bar_alpha"]
+        )
+        stylize_axes(
+            ax,
+            title=f"Categorical Distribution — {col}",
+            xlabel=col,
+            ylabel="Count",
+            lw=params["lw"],
+            grid_axis="y"
+        )
+        ax.tick_params(axis="x", rotation=30, labelrotation=30)
+        st.pyplot(fig, use_container_width=False)
+        plt.close(fig)
 
 # --- Boxplot for numeric columns ---
 def show_boxplot(df: pd.DataFrame) -> None:
@@ -243,11 +295,43 @@ def show_boxplot(df: pd.DataFrame) -> None:
     if len(num_cols) == 0:
         st.info("No numeric columns available for boxplot.")
         return
+
     col = st.selectbox("Select a numeric column for boxplot", num_cols, key="eda_show_boxplot_numeric_select")
-    fig, ax = plt.subplots()
-    sns.boxplot(x=df[col], ax=ax)
-    st.pyplot(fig)
-    plt.close(fig)
+
+    compact = st.session_state.get("compact_mode", False)
+    params = get_style_params(compact)
+
+    with PlotStyle(compact):
+        fig, ax = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
+        sns.boxplot(
+            x=df[col],
+            ax=ax,
+            color=params["main_color"],
+            fliersize=2.5 if compact else 3.5,
+            linewidth=params["bar_edge_width"]
+        )
+        stylize_axes(
+            ax,
+            title=f"Boxplot — {col}",
+            xlabel=col,
+            ylabel=None,
+            lw=params["lw"],
+            grid_axis=None
+        )
+        st.pyplot(fig, use_container_width=False)
+        plt.close(fig)
+
+# def show_boxplot(df: pd.DataFrame) -> None:
+#     st.subheader("Outlier Detection (Boxplot)")
+#     num_cols = df.select_dtypes(include=["number"]).columns
+#     if len(num_cols) == 0:
+#         st.info("No numeric columns available for boxplot.")
+#         return
+#     col = st.selectbox("Select a numeric column for boxplot", num_cols, key="eda_show_boxplot_numeric_select")
+#     fig, ax = plt.subplots()
+#     sns.boxplot(x=df[col], ax=ax)
+#     st.pyplot(fig)
+#     plt.close(fig)
 
 # --- Value counts for categorical columns ---
 def show_value_counts(df: pd.DataFrame) -> None:
