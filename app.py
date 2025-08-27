@@ -28,11 +28,6 @@ st.title("AI Data Insight Dashboard")
 
 # --- Sidebar: Global Settings ---
 with st.sidebar:
-    # st.header("Global Settings")
-    # st.session_state["compact_mode"] = st.checkbox("Compact mode (smaller plots, tighter layout)", value=False)
-    # st.session_state["collapse_plots"] = st.checkbox("Collapse plots by default", value=False)
-    # st.session_state["global_seed"] = st.number_input("Random seed", min_value=0, value=42, step=1)
-    # st.session_state["cv_folds"] = st.number_input("CV folds", min_value=2, max_value=10, value=5, step=1)
     utils.sidebar_global_settings()
     utils.sidebar_llm_settings()
 
@@ -271,7 +266,6 @@ if st.session_state.df is not None:
                             for model, metrics in output["results"].items():
                                 summary_data.append({
                                     "Model": model,
-                                    #"R²": metrics.get("r2", None),
                                     "R²": metrics.get("r2_score", None),
                                     "MAE": metrics.get("mae", None),
                                     "RMSE": metrics.get("rmse", None),
@@ -375,7 +369,6 @@ if st.session_state.df is not None:
             st.caption(f"⚠️ The following columns were excluded from modeling: {', '.join(excluded_cols)}")
 
 # --- Reset Button Section ---
-# Add reset button at the bottom, only if a file has been processed
 if st.session_state.df is not None:
     st.markdown("---") # Add a separator before the reset button for better UI
     if st.button("Reset Application"):

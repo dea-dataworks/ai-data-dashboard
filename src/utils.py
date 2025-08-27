@@ -8,6 +8,7 @@ import streamlit as st
 
 from .data_preprocess import preprocess_df
 from .ml_models import train_and_evaluate
+from .eda import get_style_params, PlotStyle, stylize_axes
 import matplotlib.pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay, RocCurveDisplay
 
@@ -130,40 +131,55 @@ def run_models(df: pd.DataFrame, target: str) -> dict:
     }
 
 def plot_confusion_matrix(y_true, y_pred, labels):
-    fig, ax = plt.subplots()
-    #disp = ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels=labels, cmap="Blues", ax=ax)
-    ConfusionMatrixDisplay.from_predictions(y_true, y_pred, display_labels=labels, cmap="Blues", ax=ax)
-    #plt.close(fig)
+    compact = st.session_state.get("compact_mode", False)
+    params = get_style_params(compact)
 
+    with PlotStyle(compact):
+        fig, ax = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
+        ConfusionMatrixDisplay.from_predictions(
+            y_true, y_pred, display_labels=labels, cmap=params["cmap"], ax=ax
+        )
+        stylize_axes(ax, title="Confusion Matrix", xlabel="Predicted", ylabel="Actual", lw=params["lw"], grid_axis=None)
     return fig
 
 def plot_roc_curve(y_true, y_proba):
-    fig, ax = plt.subplots()
-    RocCurveDisplay.from_predictions(y_true, y_proba, ax=ax)
-    #plt.close(fig)
+    compact = st.session_state.get("compact_mode", False)
+    params = get_style_params(compact)
+
+    with PlotStyle(compact):
+        fig, ax = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
+        RocCurveDisplay.from_predictions(y_true, y_proba, ax=ax)
+        # Style tweaks: thicker lines, consistent color for the model curve
+        for line in ax.get_lines():
+            line.set_linewidth(params["lw"] + 0.5)
+        # Diagonal baseline stays dashed grey; model curve adopts main color
+        if len(ax.get_lines()) >= 1:
+            ax.get_lines()[0].set_color(params["main_color"])
+        stylize_axes(ax, title="ROC Curve", xlabel="False Positive Rate", ylabel="True Positive Rate", lw=params["lw"], grid_axis=None)
     return fig
 
 def plot_regression_diagnostics(y_true, y_pred):
     figs = []
+    compact = st.session_state.get("compact_mode", False)
+    params = get_style_params(compact)
 
-    # Residuals vs fitted
-    fig1, ax1 = plt.subplots()
-    residuals = y_true - y_pred
-    ax1.scatter(y_pred, residuals, alpha=0.6)
-    ax1.axhline(0, color="red", linestyle="--")
-    ax1.set_xlabel("Predicted")
-    ax1.set_ylabel("Residuals")
-    ax1.set_title("Residuals vs Fitted")
-    figs.append(fig1)
+    # Residuals vs Fitted
+    with PlotStyle(compact):
+        fig1, ax1 = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
+        residuals = y_true - y_pred
+        ax1.scatter(y_pred, residuals, alpha=0.6, color=params["main_color"], edgecolors="none")
+        ax1.axhline(0, color="#666666", linestyle="--", linewidth=params["lw"])
+        stylize_axes(ax1, title="Residuals vs Fitted", xlabel="Predicted", ylabel="Residuals", lw=params["lw"], grid_axis="y")
+        figs.append(fig1)
 
-    # y vs yhat
-    fig2, ax2 = plt.subplots()
-    ax2.scatter(y_true, y_pred, alpha=0.6)
-    ax2.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], "r--")
-    ax2.set_xlabel("Actual")
-    ax2.set_ylabel("Predicted")
-    ax2.set_title("Prediction Error Plot")
-    figs.append(fig2)
+    # Prediction Error Plot
+    with PlotStyle(compact):
+        fig2, ax2 = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
+        ax2.scatter(y_true, y_pred, alpha=0.6, color=params["main_color"], edgecolors="none")
+        lo, hi = float(min(y_true.min(), y_pred.min())), float(max(y_true.max(), y_pred.max()))
+        ax2.plot([lo, hi], [lo, hi], "--", color="#666666", linewidth=params["lw"])
+        stylize_axes(ax2, title="Prediction Error Plot", xlabel="Actual", ylabel="Predicted", lw=params["lw"], grid_axis=None)
+        figs.append(fig2)
 
     return figs
 
@@ -171,12 +187,22 @@ def plot_feature_importances(importances: dict, top_n: int = 10):
     if not importances:
         return None
 
+    compact = st.session_state.get("compact_mode", False)
+    params = get_style_params(compact)
+
     s = pd.Series(importances).sort_values(ascending=False).head(top_n)
-    fig, ax = plt.subplots()
-    s.plot(kind="barh", ax=ax)
-    ax.set_xlabel("Importance")
-    ax.set_title(f"Top {top_n} Features (Random Forest)")
-    plt.gca().invert_yaxis()
+    with PlotStyle(compact):
+        fig, ax = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
+        ax.barh(
+            s.index.astype(str),
+            s.values,
+            color=params["main_color"],
+            edgecolor=params.get("bar_edge_color", "#00000020"),
+            linewidth=params.get("bar_edge_width", 0.8),
+            alpha=params.get("bar_alpha", 0.95),
+        )
+        ax.invert_yaxis()
+        stylize_axes(ax, title=f"Top {top_n} Features (Random Forest)", xlabel="Importance", ylabel=None, lw=params["lw"], grid_axis="x")
     return fig
 
 # ---------- Exporting utility ----------
