@@ -212,13 +212,16 @@ def _ts():
 def _slugify(s: str) -> str:
     return "".join(c.lower() if c.isalnum() else "-" for c in s).strip("-")
 
-def df_download_buttons(title: str, df: pd.DataFrame, base: str = "dashboard"):
-    """Show CSV + Excel download buttons for a DataFrame."""
+def df_download_buttons(title: str, df: pd.DataFrame, base: str = "dashboard", excel: str = "off"):
+    """
+    Show CSV + (optionally) Excel download buttons for a DataFrame.
+    excel: "on" | "off"
+    """
     if df is None or df.empty:
         return
     name = f"{_slugify(base)}-{_slugify(title)}-{_ts()}"
 
-    # CSV
+    # CSV (primary)
     csv_bytes = df.to_csv(index=False).encode("utf-8")
     st.download_button(
         f"⬇️ Download {title} (CSV)",
@@ -228,19 +231,20 @@ def df_download_buttons(title: str, df: pd.DataFrame, base: str = "dashboard"):
         use_container_width=True
     )
 
-    # Excel
-    xbuf = BytesIO()
-    with pd.ExcelWriter(xbuf, engine="openpyxl") as writer:
-        sheet = _slugify(title)[:28] or "data"
-        df.to_excel(writer, index=False, sheet_name=sheet)
-    xbuf.seek(0)
-    st.download_button(
-        f"⬇️ Download {title} (Excel)",
-        data=xbuf,
-        file_name=f"{name}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
-    )
+    # Excel (secondary, only if enabled)
+    if excel == "on":
+        xbuf = BytesIO()
+        with pd.ExcelWriter(xbuf, engine="openpyxl") as writer:
+            sheet = _slugify(title)[:28] or "data"
+            df.to_excel(writer, index=False, sheet_name=sheet)
+        xbuf.seek(0)
+        st.download_button(
+            f"⬇️ Download {title} (Excel)",
+            data=xbuf,
+            file_name=f"{name}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
 
 def fig_download_button(title: str, fig, base: str = "dashboard", dpi: int = 150):
     """Show a PNG download button for a Matplotlib figure."""
@@ -278,6 +282,10 @@ def sidebar_global_settings():
     st.session_state["collapse_plots"] = st.checkbox("Collapse plots by default", value=False)
     st.session_state["global_seed"] = st.number_input("Random seed", min_value=0, value=42, step=1)
     st.session_state["cv_folds"] = st.number_input("CV folds", min_value=2, max_value=10, value=5, step=1)
+    st.sidebar.checkbox("Show Excel downloads",value=st.session_state.get("dl_excel_global", False), key="dl_excel_global",
+    help="When on, all tables show an Excel button alongside CSV.")
+
+    
 
 def sidebar_llm_settings():
     st.subheader("🤖 LLM Provider")

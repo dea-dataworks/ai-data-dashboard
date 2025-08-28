@@ -13,13 +13,13 @@ import src.llm_report as llm_report
 from src.utils import df_download_buttons, fig_download_button
 
 
-import matplotlib as mpl
+# import matplotlib as mpl
 from matplotlib import font_manager as fm
 
-fam = mpl.rcParams.get("font.family", ["sans-serif"])
-print("Font family set to:", fam)
-resolved = fm.FontProperties(family=fam).get_name()
-print("Matplotlib actually using:", resolved)
+# fam = mpl.rcParams.get("font.family", ["sans-serif"])
+# print("Font family set to:", fam)
+# resolved = fm.FontProperties(family=fam).get_name()
+# print("Matplotlib actually using:", resolved)
 
 
 # Set page configuration
@@ -111,29 +111,42 @@ if st.session_state.df is not None:
         st.subheader("Machine Learning")
 
         if df is not None:
-            target = st.selectbox("Select target variable", df.columns)
+            target = st.selectbox("Select target variable",df.columns,
+                help="This is the column you want to predict. For classification, pick a discrete label (e.g., Survived). For regression, pick a numeric target.")
             # the target was saved when selected in the ML tab to be used in Mutual Information section of the EDA. Not being used right now.
             st.session_state["ml_target"] = target
 
             # the option to exclude columns from modeling (e.g. IDs, free text, obvious leakage)
             all_features = [c for c in df.columns if c != target]
-            exclude_cols = st.multiselect("Exclude columns from modeling (e.g., IDs, free text, obvious leakage)",
-                                          options=all_features, 
-                                          key="ml_exclude_cols")
+            exclude_cols = st.multiselect("Exclude columns from modeling",options=all_features,key="ml_exclude_cols",help="Optional: remove identifiers, free text, or any columns that would leak the target.")
 
+            dataset_name = st.session_state.get("dataset_name", "dataset")
+            excel_pref = "on" if st.session_state.get("dl_excel_global") else "off"
+            
             if target:
                 try:
                     # Preprocess (safe step: drops high-cardinality, splits X/y)
                     X, y = data_preprocess.preprocess_df(df, target, exclude=exclude_cols)
                     st.session_state["ml_excluded_cols"] = exclude_cols
 
-                    # toggle to choose to use k fold cross validation
-                    use_cv = st.checkbox("Use 5-fold cross-validation (metrics only)", value=False, key="ml_use_cv")
+                    cv_folds = int(st.session_state.get("cv_folds", 5))
+
+                    use_cv = st.checkbox(
+                        f"Use {cv_folds}-fold cross-validation (metrics only)",
+                        value=False,
+                        key="ml_use_cv",
+                        help="Reports mean±std scores across folds. Turn OFF to see the single 80/20 split with diagnostic plots."
+                    )
+
+                    # # toggle to choose to use k fold cross validation
+                    # use_cv = st.checkbox("Use 5-fold cross-validation (metrics only)", value=False, key="ml_use_cv")
+                    
 
                     if use_cv:
-                        cv_out = ml.cross_validate_models(X, y, cv_splits=5)
+                        cv_out = ml.cross_validate_models(X, y, cv_splits=cv_folds)
                         task_type = cv_out["task_type"]
-                        st.write(f"### Detected Task: {task_type.capitalize()} (5-fold CV)")
+                        st.write(f"### Detected Task: {task_type.capitalize()} ({cv_folds}-fold CV)")
+
 
                         if task_type == "classification":
                             rows = []
@@ -146,10 +159,8 @@ if st.session_state.df is not None:
                                 })
                             cv_df = pd.DataFrame(rows).set_index("Model")
                             st.table(cv_df)
-                            df_download_buttons("cv-metrics", cv_df, base=st.session_state.get("dataset_name", "dataset"))
-
-
                             
+                            df_download_buttons("cv-metrics", cv_df, base=dataset_name, excel=excel_pref)
 
                         else:  # regression
                             rows = []
@@ -162,7 +173,7 @@ if st.session_state.df is not None:
                                 })
                             cv_df = pd.DataFrame(rows).set_index("Model")
                             st.table(cv_df)
-                            df_download_buttons("cv-metrics", cv_df, base=st.session_state.get("dataset_name", "dataset"))
+                            df_download_buttons("cv-metrics", cv_df, base=dataset_name, excel=excel_pref)
 
 
 
@@ -200,7 +211,7 @@ if st.session_state.df is not None:
 
                             st.write("#### Performance Summary")
                             st.table(summary_df_table.set_index("Model"))
-                            df_download_buttons("test-metrics", summary_df, base=st.session_state.get("dataset_name", "dataset"))
+                            df_download_buttons("test-metrics", summary_df, base=dataset_name, excel=excel_pref)
                             
                             # Advanced Metrics
                             with st.expander("🔍 Advanced Metrics (per-class details)"):
@@ -211,7 +222,7 @@ if st.session_state.df is not None:
                                         report_df = pd.DataFrame(metrics["classification_report"]).transpose()
                                         report_df = report_df.round(3)
                                         st.dataframe(report_df)
-                                        df_download_buttons(f"{model}-classification-report", report_df, base=st.session_state.get("dataset_name", "dataset"))
+                                        df_download_buttons(f"{model}-classification-report", report_df, base=dataset_name, excel=excel_pref)
                                     else:
                                         st.write("No detailed report available.")
                             
@@ -223,8 +234,7 @@ if st.session_state.df is not None:
                                         if fig:
                                             st.markdown(f"**{model}**")
                                             st.pyplot(fig)
-                                            fig_download_button(f"{model}-rf-importances", fig, base=st.session_state.get("dataset_name", "dataset"))
-
+                                            fig_download_button(f"{model}-rf-importances", fig, base=dataset_name)
 
                             # Model Diagnostics
                             with st.expander("📊 Model Diagnostics (Visuals)"):
@@ -244,7 +254,7 @@ if st.session_state.df is not None:
                                         st.caption("• Confusion Matrix: shows how many samples were correctly or incorrectly classified.")
                                         fig = utils.plot_confusion_matrix(y_test, preds, labels=sorted(y.unique()))
                                         st.pyplot(fig)
-                                        fig_download_button(f"{model}-confusion-matrix", fig, base=st.session_state.get("dataset_name", "dataset"))
+                                        fig_download_button(f"{model}-confusion-matrix", fig, base=dataset_name)
                                         plt.close(fig)
 
                                         # ROC Curve (only for binary classification and if probabilities available)
@@ -252,7 +262,7 @@ if st.session_state.df is not None:
                                             st.caption("• ROC Curve: visualizes the model's ability to separate classes; higher curve = better.")
                                             fig = utils.plot_roc_curve(y_test, probs)
                                             st.pyplot(fig)
-                                            fig_download_button(f"{model}-roc-curve", fig, base=st.session_state.get("dataset_name", "dataset"))
+                                            fig_download_button(f"{model}-roc-curve", fig, base=dataset_name)
                                             plt.close(fig)
 
                                         st.markdown("---")
@@ -287,7 +297,7 @@ if st.session_state.df is not None:
                         
                             st.write("#### Performance Summary")
                             st.table(summary_df_table.set_index("Model"))
-                            df_download_buttons("test-metrics", summary_df, base=st.session_state.get("dataset_name", "dataset"))
+                            df_download_buttons("test-metrics", summary_df, base=dataset_name, excel=excel_pref)
 
                             # Advanced Metrics (extra details if available)
                             with st.expander("🔍 Advanced Metrics"):
@@ -308,11 +318,7 @@ if st.session_state.df is not None:
                                         ],
                                     })
                                     st.dataframe(adv_df.style.format({"value": "{:.3f}"}), use_container_width=True)
-                                    df_download_buttons(
-                                        f"{model}-advanced-metrics",
-                                        adv_df,
-                                        base=st.session_state.get("dataset_name", "dataset")
-                                    )
+                                    df_download_buttons(f"{model}-advanced-metrics", adv_df, base=dataset_name, excel=excel_pref)
 
 
 
@@ -324,7 +330,7 @@ if st.session_state.df is not None:
                                         if fig:
                                             st.markdown(f"**{model}**")
                                             st.pyplot(fig)
-                                            fig_download_button(f"{model}-rf-importances", fig, base=st.session_state.get("dataset_name", "dataset"))
+                                            fig_download_button(f"{model}-rf-importances", fig, base=dataset_name)
 
                             
                             # Model Diagnostics
@@ -344,12 +350,12 @@ if st.session_state.df is not None:
 
                                             st.caption("• Residuals vs Fitted: errors should be scattered randomly if the model fits well.")
                                             st.pyplot(figs[0]) 
-                                            fig_download_button(f"{model}-residuals-vs-fitted", figs[0], base=st.session_state.get("dataset_name", "dataset"))
+                                            fig_download_button(f"{model}-residuals-vs-fitted", figs[0], base=dataset_name)
                                             plt.close(figs[0])
 
                                             st.caption("• Prediction Error Plot: closer points to the diagonal line mean better predictions.")
                                             st.pyplot(figs[1])
-                                            fig_download_button(f"{model}-prediction-error", figs[1], base=st.session_state.get("dataset_name", "dataset"))
+                                            fig_download_button(f"{model}-prediction-error", figs[1], base=dataset_name)
                                             plt.close(figs[1])
                                             st.markdown("---")
 
