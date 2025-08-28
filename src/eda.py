@@ -39,15 +39,23 @@ def _is_dark_theme() -> bool:
     except Exception:
         return False
 
-def get_style_params(compact: bool):
+def get_style_params(compact: bool) -> dict:
+    """
+    Keep your original styling and visible compact shrink in places where figsize matters (e.g., EDA).
+    Only change: unify histogram bins so compact vs normal doesn't *look* different due to bin count.
+    Note: In two-column layouts (ML diagnostics), Streamlit width is fixed by the column,
+    so figsize differences won't be noticeable — that's expected.
+    """
+    BINS = 30  # <-- unified bins (the only real change)
+
     return {
-        "figsize": (6.5, 3.6) if compact else (8.8, 4.8),
+        "figsize": (6.5, 3.6) if compact else (8.8, 4.8),   
         "dpi": 120,
         "title_fs": 12 if compact else 14,
         "label_fs": 10 if compact else 12,
         "tick_fs": 9 if compact else 10,
         "lw": 1.1 if compact else 1.3,
-        "bins": 15 if compact else 30,
+        "bins": BINS,  # <-- unified
         "cmap": "Blues",
         "main_color": DASHBOARD_COLOR,
         "axes_face": "#22262e" if _is_dark_theme() else "#FAFAFA",
@@ -56,6 +64,7 @@ def get_style_params(compact: bool):
         "bar_edge_color": "#000000",
         "bar_edge_width": 0.7 if compact else 0.8,
     }
+
 
 class PlotStyle:
     def __init__(self, compact: bool):
@@ -255,29 +264,42 @@ def show_correlation(df):
 def plot_distributions(df):
     compact = st.session_state.get("compact_mode", False)
     params = get_style_params(compact)
-    # st.subheader("Feature Distributions")
-    st.write("This section allows you to visualize the distribution of numerical features using **histograms** and **Kernel Density Estimates (KDE)**. Histograms show the frequency of data points within specific bins, while KDE provides a smooth estimate of the data's probability density.")
-    col = st.selectbox("Select a numeric column", df.select_dtypes(include=["int64", "float64"]).columns, key="eda_plot_distributions_numeric_select")
+
+    st.write(
+        "This section allows you to visualize the distribution of numerical "
+        "features using **histograms** and **Kernel Density Estimates (KDE)**. "
+        "Histograms show the frequency of data points within specific bins, "
+        "while KDE provides a smooth estimate of the data's probability density."
+    )
+
+    col = st.selectbox(
+        "Select a numeric column",
+        df.select_dtypes(include=["int64", "float64"]).columns,
+        key="eda_plot_distributions_numeric_select",
+    )
 
     fig, ax = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
     with PlotStyle(compact):
         ax.hist(
             df[col].dropna(),
-            bins=params["bins"],
+            bins=params["bins"],                 # now unified via get_style_params
             color=params["main_color"],                  
             edgecolor=params["bar_edge_color"],          
             linewidth=params["bar_edge_width"],
             alpha=params["bar_alpha"]
         )
-        stylize_axes(ax,
-                    title=f"Distribution — {col}",
-                    xlabel=col,
-                    ylabel="Count",
-                    lw=params["lw"],
-                    grid_axis="y")
+        stylize_axes(
+            ax,
+            title=f"Distribution — {col}",
+            xlabel=col,
+            ylabel="Count",
+            lw=params["lw"],
+            grid_axis="y"
+        )
 
     st.pyplot(fig, use_container_width=False)
     plt.close(fig)
+
 
 def plot_categorical(df):
     # st.subheader("Categorical Feature Distribution")

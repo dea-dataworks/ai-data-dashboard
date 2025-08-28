@@ -233,7 +233,7 @@ if st.session_state.df is not None:
                                         fig = utils.plot_feature_importances(metrics["feature_importances"])
                                         if fig:
                                             st.markdown(f"**{model}**")
-                                            st.pyplot(fig)
+                                            st.pyplot(fig, use_container_width=False)
                                             fig_download_button(f"{model}-rf-importances", fig, base=dataset_name)
 
                             # Model Diagnostics
@@ -250,42 +250,20 @@ if st.session_state.df is not None:
                                             st.info("No predictions available for this model.")
                                             continue
 
-                                        # Confusion Matrix
-                                        # col1, col2 = st.columns(2)
-
-                                        # with col1:
-                                        #     st.caption("• Confusion Matrix")
-                                        #     cm_fig = utils.plot_confusion_matrix(y_test, preds, labels=sorted(y.unique()))
-                                        #     st.pyplot(cm_fig)
-                                        #     fig_download_button(f"{model}-confusion-matrix", cm_fig, base=st.session_state.get("dataset_name", "dataset"))
-                                        #     plt.close(cm_fig)
-
-                                        # with col2:
-                                        #     if probs is not None and y.nunique() == 2:
-                                        #         st.caption("• ROC Curve")
-                                        #         roc_fig = utils.plot_roc_curve(y_test, probs)
-                                        #         st.pyplot(roc_fig)
-                                        #         fig_download_button(f"{model}-roc-curve", roc_fig, base=st.session_state.get("dataset_name", "dataset"))
-                                        #         plt.close(roc_fig)
-                                        #     else:
-                                        #         st.caption("• ROC Curve")
-                                        #         st.info("ROC not available (needs binary target and probability scores).")
-                                        # st.markdown("---")
-
                                         # --- Confusion Matrix + ROC side-by-side (plots row)
                                         col1, col2 = st.columns(2)
 
                                         with col1:
                                             st.caption("• Confusion Matrix")
                                             cm_fig = utils.plot_confusion_matrix(y_test, preds, labels=sorted(y.unique()))
-                                            st.pyplot(cm_fig)
+                                            st.pyplot(cm_fig, use_container_width=False)
 
                                         with col2:
                                             st.caption("• ROC Curve")
                                             roc_fig = None
                                             if probs is not None and y.nunique() == 2:
                                                 roc_fig = utils.plot_roc_curve(y_test, probs)
-                                                st.pyplot(roc_fig)
+                                                st.pyplot(roc_fig, use_container_width=False)
                                             else:
                                                 st.info("ROC not available (needs binary target and probability scores).")
 
@@ -376,7 +354,7 @@ if st.session_state.df is not None:
                                         fig = utils.plot_feature_importances(metrics["feature_importances"])
                                         if fig:
                                             st.markdown(f"**{model}**")
-                                            st.pyplot(fig)
+                                            st.pyplot(fig, use_container_width=False)
                                             fig_download_button(f"{model}-rf-importances", fig, base=dataset_name)
 
                             
@@ -395,29 +373,14 @@ if st.session_state.df is not None:
 
                                             figs = utils.plot_regression_diagnostics(y_test, preds)
 
-                                            # col1, col2 = st.columns(2)
-
-                                            # with col1:
-                                            #     st.caption("• Residuals vs Fitted")
-                                            #     st.pyplot(figs[0])
-                                            #     fig_download_button(f"{model}-residuals-vs-fitted", figs[0], base=st.session_state.get("dataset_name", "dataset"))
-                                            #     plt.close(figs[0])
-
-                                            # with col2:
-                                            #     st.caption("• Prediction Error Plot")
-                                            #     st.pyplot(figs[1])
-                                            #     fig_download_button(f"{model}-prediction-error", figs[1], base=st.session_state.get("dataset_name", "dataset"))
-                                            #     plt.close(figs[1])
-                                            # st.markdown("---")
-
                                             # --- Residuals vs Fitted + Prediction Error (plots row)
                                             col1, col2 = st.columns(2)
                                             with col1:
                                                 st.caption("• Residuals vs Fitted")
-                                                st.pyplot(figs[0])
+                                                st.pyplot(figs[0], use_container_width=False)
                                             with col2:
                                                 st.caption("• Prediction Error Plot")
-                                                st.pyplot(figs[1])
+                                                st.pyplot(figs[1], use_container_width=False)
 
                                             # --- Download buttons row (always aligned)
                                             b1, b2 = st.columns(2)
