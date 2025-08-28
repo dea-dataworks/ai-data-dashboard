@@ -250,21 +250,41 @@ if st.session_state.df is not None:
                                             st.info("No predictions available for this model.")
                                             continue
 
+                                        # # Confusion Matrix
+                                        # st.caption("• Confusion Matrix: shows how many samples were correctly or incorrectly classified.")
+                                        # fig = utils.plot_confusion_matrix(y_test, preds, labels=sorted(y.unique()))
+                                        # st.pyplot(fig)
+                                        # fig_download_button(f"{model}-confusion-matrix", fig, base=dataset_name)
+                                        # plt.close(fig)
+
+                                        # # ROC Curve (only for binary classification and if probabilities available)
+                                        # if probs is not None and y.nunique() == 2:
+                                        #     st.caption("• ROC Curve: visualizes the model's ability to separate classes; higher curve = better.")
+                                        #     fig = utils.plot_roc_curve(y_test, probs)
+                                        #     st.pyplot(fig)
+                                        #     fig_download_button(f"{model}-roc-curve", fig, base=dataset_name)
+                                        #     plt.close(fig)
+
                                         # Confusion Matrix
-                                        st.caption("• Confusion Matrix: shows how many samples were correctly or incorrectly classified.")
-                                        fig = utils.plot_confusion_matrix(y_test, preds, labels=sorted(y.unique()))
-                                        st.pyplot(fig)
-                                        fig_download_button(f"{model}-confusion-matrix", fig, base=dataset_name)
-                                        plt.close(fig)
+                                        col1, col2 = st.columns(2)
 
-                                        # ROC Curve (only for binary classification and if probabilities available)
-                                        if probs is not None and y.nunique() == 2:
-                                            st.caption("• ROC Curve: visualizes the model's ability to separate classes; higher curve = better.")
-                                            fig = utils.plot_roc_curve(y_test, probs)
-                                            st.pyplot(fig)
-                                            fig_download_button(f"{model}-roc-curve", fig, base=dataset_name)
-                                            plt.close(fig)
+                                        with col1:
+                                            st.caption("• Confusion Matrix")
+                                            cm_fig = utils.plot_confusion_matrix(y_test, preds, labels=sorted(y.unique()))
+                                            st.pyplot(cm_fig)
+                                            fig_download_button(f"{model}-confusion-matrix", cm_fig, base=st.session_state.get("dataset_name", "dataset"))
+                                            plt.close(cm_fig)
 
+                                        with col2:
+                                            if probs is not None and y.nunique() == 2:
+                                                st.caption("• ROC Curve")
+                                                roc_fig = utils.plot_roc_curve(y_test, probs)
+                                                st.pyplot(roc_fig)
+                                                fig_download_button(f"{model}-roc-curve", roc_fig, base=st.session_state.get("dataset_name", "dataset"))
+                                                plt.close(roc_fig)
+                                            else:
+                                                st.caption("• ROC Curve")
+                                                st.info("ROC not available (needs binary target and probability scores).")
                                         st.markdown("---")
 
                             # Metric Definitions
@@ -348,15 +368,30 @@ if st.session_state.df is not None:
 
                                             figs = utils.plot_regression_diagnostics(y_test, preds)
 
-                                            st.caption("• Residuals vs Fitted: errors should be scattered randomly if the model fits well.")
-                                            st.pyplot(figs[0]) 
-                                            fig_download_button(f"{model}-residuals-vs-fitted", figs[0], base=dataset_name)
-                                            plt.close(figs[0])
+                                            # st.caption("• Residuals vs Fitted: errors should be scattered randomly if the model fits well.")
+                                            # st.pyplot(figs[0]) 
+                                            # fig_download_button(f"{model}-residuals-vs-fitted", figs[0], base=dataset_name)
+                                            # plt.close(figs[0])
 
-                                            st.caption("• Prediction Error Plot: closer points to the diagonal line mean better predictions.")
-                                            st.pyplot(figs[1])
-                                            fig_download_button(f"{model}-prediction-error", figs[1], base=dataset_name)
-                                            plt.close(figs[1])
+                                            # st.caption("• Prediction Error Plot: closer points to the diagonal line mean better predictions.")
+                                            # st.pyplot(figs[1])
+                                            # fig_download_button(f"{model}-prediction-error", figs[1], base=dataset_name)
+                                            # plt.close(figs[1])
+
+                                            # Residuals vs Fitted
+                                            col1, col2 = st.columns(2)
+
+                                            with col1:
+                                                st.caption("• Residuals vs Fitted")
+                                                st.pyplot(figs[0])
+                                                fig_download_button(f"{model}-residuals-vs-fitted", figs[0], base=st.session_state.get("dataset_name", "dataset"))
+                                                plt.close(figs[0])
+
+                                            with col2:
+                                                st.caption("• Prediction Error Plot")
+                                                st.pyplot(figs[1])
+                                                fig_download_button(f"{model}-prediction-error", figs[1], base=st.session_state.get("dataset_name", "dataset"))
+                                                plt.close(figs[1])
                                             st.markdown("---")
 
                             # Metric Definitions
