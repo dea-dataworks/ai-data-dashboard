@@ -11,6 +11,9 @@ from src.data_preprocess import preprocess_df
 from src.ml_models import train_and_evaluate
 import src.llm_report as llm_report
 from src.utils import df_download_buttons, fig_download_button
+from src import utils
+
+
 
 
 # import matplotlib as mpl
@@ -20,6 +23,8 @@ from matplotlib import font_manager as fm
 # print("Font family set to:", fam)
 # resolved = fm.FontProperties(family=fam).get_name()
 # print("Matplotlib actually using:", resolved)
+
+
 
 
 # Set page configuration
@@ -138,16 +143,12 @@ if st.session_state.df is not None:
                         help="Cross-validation splits your data into multiple folds to give more reliable performance estimates. It takes longer to run but reduces the risk of overfitting to a single split. Reports mean ± std scores across folds. Turn OFF to use a single 80/20 split and view diagnostic plots."
                     )
 
-                    # # toggle to choose to use k fold cross validation
-                    # use_cv = st.checkbox("Use 5-fold cross-validation (metrics only)", value=False, key="ml_use_cv")
-                    
-
                     if use_cv:
                         cv_out = ml.cross_validate_models(X, y, cv_splits=cv_folds)
                         task_type = cv_out["task_type"]
                         st.write(f"### Detected Task: {task_type.capitalize()} ({cv_folds}-fold CV)")
 
-
+                        # --- Build cv_df inside each task branch ---
                         if task_type == "classification":
                             rows = []
                             for model, m in cv_out["results"].items():
@@ -158,10 +159,6 @@ if st.session_state.df is not None:
                                     "ROC AUC (mean±std)": ("—" if m["roc_auc_mean"] is None else f"{m['roc_auc_mean']:.3f} ± {m['roc_auc_std']:.3f}")
                                 })
                             cv_df = pd.DataFrame(rows).set_index("Model")
-                            st.table(cv_df)
-                            
-                            df_download_buttons("cv-metrics", cv_df, base=dataset_name, excel=excel_pref)
-
                         else:  # regression
                             rows = []
                             for model, m in cv_out["results"].items():
@@ -172,16 +169,69 @@ if st.session_state.df is not None:
                                     "RMSE (mean±std)": f"{m['rmse_mean']:.3f} ± {m['rmse_std']:.3f}",
                                 })
                             cv_df = pd.DataFrame(rows).set_index("Model")
-                            st.table(cv_df)
-                            df_download_buttons("cv-metrics", cv_df, base=dataset_name, excel=excel_pref)
 
+                         # --- Common render + downloads (once) ---
+                        st.table(cv_df)
+                        df_download_buttons("cv-metrics", cv_df, base=dataset_name, excel=excel_pref)
 
-
+                        # --- Common cache (once) ---
+                        st.session_state["ml_output"] = cv_out
+                        st.session_state["ml_target"] = target
+                        st.session_state["ml_excluded_cols"] = exclude_cols
+                        st.session_state["ml_cv_used"] = True
+                        st.session_state["ml_cv_folds"] = cv_folds
+                        try:
+                            st.session_state["ml_models_table_md"] = cv_df.to_markdown()
+                        except Exception:
+                            st.session_state["ml_models_table_md"] = ""
+                        st.session_state["ml_rf_importances"] = None  # CV path: not computed
+                        st.session_state["ml_signature"] = utils.ml_signature(
+                            df,
+                            st.session_state.get("dataset_name", "dataset"),
+                            target,
+                            exclude_cols,
+                            cv_used=True,
+                             cv_folds=cv_folds,
+                            )
+                        
                         st.info("Cross-validation shows typical performance across folds. Turn off the checkbox to view the single 80/20 split and diagnostics plots.")
-
                     else:
                         # Train models + evaluate
                         output = ml.train_and_evaluate(X, y, target)
+                        # --- Cache for LLM Report (single 80/20 run) ---
+                        st.session_state["ml_output"] = output
+                        st.session_state["ml_target"] = target
+                        st.session_state["ml_excluded_cols"] = exclude_cols
+                        st.session_state["ml_cv_used"] = False
+                        st.session_state["ml_cv_folds"] = None
+
+                        # Metrics table in the same format the Report tab expects
+                        try:
+                            st.session_state["ml_models_table_md"] = llm_report._format_model_metrics(output)
+                        except Exception:
+                            st.session_state["ml_models_table_md"] = ""
+
+                        # Extract one set of feature importances (e.g., Random Forest) for the report
+                        rf_top_k = 10
+                        rf_importances = {}
+                        for model_name, m in output.get("results", {}).items():
+                            imp = m.get("feature_importances", {})
+                            if isinstance(imp, dict) and imp:
+                                # take the first model with importances (typically Random Forest)
+                                rf_importances = dict(sorted(imp.items(), key=lambda x: x[1], reverse=True)[:rf_top_k])
+                                break
+                        st.session_state["ml_rf_importances"] = rf_importances or None
+
+                        # Signature
+                        st.session_state["ml_signature"] = utils.ml_signature(
+                            df,
+                            st.session_state.get("dataset_name", "dataset"),
+                            target,
+                            exclude_cols,
+                            cv_used=False,
+                            cv_folds=None,
+                        )
+                        
                         task_type = output["task_type"]
                         y_test = output["y_test"]
 

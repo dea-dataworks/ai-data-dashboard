@@ -310,3 +310,16 @@ def sidebar_llm_settings():
     st.session_state["ollama_model"] = ollama_model
     st.session_state["openai_model"] = openai_model
     st.session_state["openai_available"] = openai_available
+
+
+# ---- Report Helpers ---
+def ml_signature(df, dataset_name, target, excluded_cols, cv_used, cv_folds):
+    return (
+        dataset_name,
+        df.shape,
+        tuple(sorted(df.columns)),
+        target,
+        tuple(sorted(excluded_cols or [])),
+        bool(cv_used),
+        int(cv_folds) if cv_used else None,
+    )
