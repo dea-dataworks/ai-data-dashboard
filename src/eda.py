@@ -104,10 +104,10 @@ def stylize_axes(ax, title=None, xlabel=None, ylabel=None, lw=1.3, grid_axis=Non
 # --- Schema / Snapshot panel ---
 def show_schema_panel(df: pd.DataFrame) -> None:
     """
-    Read-only snapshot of the dataset: dtype counts, memory, overall missing, and
-    top-5 high-cardinality text columns.
+    Read-only snapshot of the dataset: dtype counts, memory, overall missing.
+    (top-5 high-cardinality text columns moved to Summary)
     """
-    st.subheader("Dataset Snapshot")
+    #st.subheader("Dataset Snapshot")
 
     # Type counts
     num_cols = df.select_dtypes(include=["number"]).columns
@@ -137,25 +137,56 @@ def show_schema_panel(df: pd.DataFrame) -> None:
     with c7:
         st.metric("Overall Missing (%)", f"{overall_missing_pct:.2f}%")
 
-    # High-cardinality text columns (top 5)
-    if len(cat_cols) > 0:
-        card = (
-            df[cat_cols]
-            .nunique(dropna=True)
-            .sort_values(ascending=False)
-            .head(5)
-            .rename("unique_values")
-        )
-        st.markdown("**Top‑5 High‑Cardinality Text Columns**")
-        st.dataframe(card.to_frame())
-    else:
-        st.info("No object/category/string columns detected.")
-        
+            
 # summary
-def show_summary(df):
+def show_summary(df: pd.DataFrame):
     st.subheader("Basic Statistics")
-    st.write("This table provides a statistical summary of your dataset, including count, mean, standard deviation, and quartile information for numerical columns, and unique counts and top values for categorical columns.")
-    st.dataframe(df.describe(include="all").T)
+    st.write(
+        "Quick numerical/categorical summary below. On the right, see high-cardinality text columns; "
+        "on the left, columns with missing values."
+    )
+    # Main stats table
+    st.dataframe(
+        df.describe(include="all").T,
+        use_container_width=True,
+        height=320
+    )
+
+    # --- Side-by-side compact tables: Missing | High-Cardinality ---
+    c1, c2 = st.columns(2)
+
+    # Missing table (Count + %)
+    with c1:
+        st.markdown("**Missing values by column**")
+        missing_counts = df.isnull().sum()
+        missing_df = missing_counts[missing_counts > 0].sort_values(ascending=False).to_frame("Count")
+        if not df.empty:
+            total_rows = len(df)
+        else:
+            total_rows = 0
+        if total_rows > 0 and not missing_df.empty:
+            missing_df["Pct %"] = (missing_df["Count"] / total_rows * 100).round(2)
+            st.dataframe(missing_df, use_container_width=True, height=260)
+        else:
+            st.info("No missing values found in the dataset! 🎉")
+
+    # High-cardinality table (Top-5 text columns)
+    with c2:
+        st.markdown("**Top-5 High-Cardinality Text Columns**")
+        cat_cols = df.select_dtypes(include=["object", "category", "string"]).columns
+        if len(cat_cols) > 0:
+            card = (
+                df[cat_cols]
+                .nunique(dropna=True)
+                .sort_values(ascending=False)
+                .head(5)
+                .rename("unique_values")
+                .to_frame()
+            )
+            st.dataframe(card, use_container_width=True, height=260)
+        else:
+            st.info("No object/category/string columns detected.")
+
 
 # missing value
 def show_missing(df):
