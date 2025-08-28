@@ -79,25 +79,33 @@ if st.session_state.df is not None:
     with tab2:
         st.subheader("Exploratory Data Analysis")
         # Open these by default for quick context
+        with st.expander("Data Quality Warnings", expanded=True):
+            eda.show_data_quality_warnings(df, target=st.session_state.get("ml_target"))
+
         with st.expander("Dataset Snapshot", expanded=True):
             eda.show_schema_panel(df)
+
         with st.expander("Summary Statistics", expanded=True):
             eda.show_summary(df)
-        # Collapse the rest to reduce scrolling
-        with st.expander("Missing Values", expanded=False):
-            eda.show_missing(df)
+
+        # with st.expander("Missing Values", expanded=False):
+        #             eda.show_missing(df)
+
+        # keep the rest collapsed
+        with st.expander("Value Counts (Categorical)", expanded=False):
+            eda.show_value_counts(df)       
+
         with st.expander("Correlation Matrix", expanded=False):
             eda.show_correlation(df)
-        with st.expander("Numeric Distributions", expanded=False):
+
+        with st.expander("Numeric Feature Distributions", expanded=False):
             eda.plot_distributions(df)
-        with st.expander("Categorical Distributions", expanded=False):
+
+        with st.expander("Categorical Feature Distributions", expanded=False):
             eda.plot_categorical(df)
-        with st.expander("Boxplots (Outliers)", expanded=False):
+
+        with st.expander("Outlier Detextion (Boxplot)", expanded=False):
             eda.show_boxplot(df)
-        with st.expander("Value Counts (Categorical)", expanded=False):
-            eda.show_value_counts(df)
-        with st.expander("Data Quality Warnings", expanded=False):
-            eda.show_data_quality_warnings(df, target=st.session_state.get("ml_target"))
 
     with tab3:
         st.subheader("Machine Learning")

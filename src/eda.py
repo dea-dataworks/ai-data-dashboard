@@ -140,7 +140,7 @@ def show_schema_panel(df: pd.DataFrame) -> None:
             
 # summary
 def show_summary(df: pd.DataFrame):
-    st.subheader("Basic Statistics")
+    # st.subheader("Basic Statistics")
     st.write(
         "Quick numerical/categorical summary below. On the right, see high-cardinality text columns; "
         "on the left, columns with missing values."
@@ -209,7 +209,7 @@ def show_missing(df):
 
 # correlation
 def show_correlation(df):
-    st.subheader("Correlation Heatmap")
+    # st.subheader("Correlation Heatmap")
     st.write(
         "This heatmap visualizes the **correlation coefficients** between numerical features. "
         "Values close to **1** indicate strong positive correlation; **-1** strong negative."
@@ -255,7 +255,7 @@ def show_correlation(df):
 def plot_distributions(df):
     compact = st.session_state.get("compact_mode", False)
     params = get_style_params(compact)
-    st.subheader("Feature Distributions")
+    # st.subheader("Feature Distributions")
     st.write("This section allows you to visualize the distribution of numerical features using **histograms** and **Kernel Density Estimates (KDE)**. Histograms show the frequency of data points within specific bins, while KDE provides a smooth estimate of the data's probability density.")
     col = st.selectbox("Select a numeric column", df.select_dtypes(include=["int64", "float64"]).columns, key="eda_plot_distributions_numeric_select")
 
@@ -280,7 +280,7 @@ def plot_distributions(df):
     plt.close(fig)
 
 def plot_categorical(df):
-    st.subheader("Categorical Feature Distribution")
+    # st.subheader("Categorical Feature Distribution")
     st.write("Counts for categorical features with **< 20 unique values**.")
 
     cat_cols = df.select_dtypes(include=["object", "category"]).columns
@@ -321,13 +321,25 @@ def plot_categorical(df):
 
 # --- Boxplot for numeric columns ---
 def show_boxplot(df: pd.DataFrame) -> None:
-    st.subheader("Outlier Detection (Boxplot)")
-    num_cols = df.select_dtypes(include=["number"]).columns
-    if len(num_cols) == 0:
-        st.info("No numeric columns available for boxplot.")
+    # Numeric (exclude bool)
+    num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+    num_cols = [c for c in num_cols if df[c].dtype != bool]
+
+    # Exclude binary numeric (<= 2 unique)
+    cols_for_box = [c for c in num_cols if df[c].dropna().nunique() > 2]
+
+    if not cols_for_box:
+        st.info("No non-binary numeric columns available for boxplot.")
         return
 
-    col = st.selectbox("Select a numeric column for boxplot", num_cols, key="eda_show_boxplot_numeric_select")
+    col = st.selectbox(
+        "Select a numeric column for boxplot",
+        cols_for_box,
+        key="eda_show_boxplot_numeric_select"
+    )
+
+    data = df[col].dropna()
+    is_binary = data.nunique() <= 2  # will be False now; keep for safety
 
     compact = st.session_state.get("compact_mode", False)
     params = get_style_params(compact)
@@ -335,11 +347,12 @@ def show_boxplot(df: pd.DataFrame) -> None:
     with PlotStyle(compact):
         fig, ax = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
         sns.boxplot(
-            x=df[col],
+            x=data,
             ax=ax,
             color=params["main_color"],
-            fliersize=2.5 if compact else 3.5,
-            linewidth=params["bar_edge_width"]
+            linewidth=params["bar_edge_width"],
+            showfliers=not is_binary,
+            fliersize=0 if is_binary else (2.5 if compact else 3.5),
         )
         stylize_axes(
             ax,
@@ -347,26 +360,14 @@ def show_boxplot(df: pd.DataFrame) -> None:
             xlabel=col,
             ylabel=None,
             lw=params["lw"],
-            grid_axis=None
+            grid_axis="y",
         )
-        st.pyplot(fig, use_container_width=False)
+        st.pyplot(fig, use_container_width=not compact)
         plt.close(fig)
-
-# def show_boxplot(df: pd.DataFrame) -> None:
-#     st.subheader("Outlier Detection (Boxplot)")
-#     num_cols = df.select_dtypes(include=["number"]).columns
-#     if len(num_cols) == 0:
-#         st.info("No numeric columns available for boxplot.")
-#         return
-#     col = st.selectbox("Select a numeric column for boxplot", num_cols, key="eda_show_boxplot_numeric_select")
-#     fig, ax = plt.subplots()
-#     sns.boxplot(x=df[col], ax=ax)
-#     st.pyplot(fig)
-#     plt.close(fig)
 
 # --- Value counts for categorical columns ---
 def show_value_counts(df: pd.DataFrame) -> None:
-    st.subheader("Value Counts (Categorical)")
+    # st.subheader("Value Counts (Categorical)")
     cat_cols = df.select_dtypes(include=["object", "category"]).columns
     if len(cat_cols) == 0:
         st.info("No categorical columns available for value counts.")
@@ -378,7 +379,7 @@ def show_value_counts(df: pd.DataFrame) -> None:
 
 # --- Data quality warnings: Duplicates count, leakage checks (feature == target,|corr|≥0.95 numeric) ---
 def show_data_quality_warnings(df: pd.DataFrame, target: str | None = None) -> None:
-    st.subheader("Data Quality Warnings")
+    #st.subheader("Data Quality Warnings")
 
     issues = []
 
