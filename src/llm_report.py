@@ -7,14 +7,15 @@ from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 import streamlit as st
-from typing import Optional
-from src.utils import run_models
+import src.utils as utils
 from langchain_ollama import OllamaLLM
 try:
     from langchain_openai import ChatOpenAI
     _OPENAI_OK = True
 except Exception:
     _OPENAI_OK = False
+
+
 
 # ---- Safe helper: get OpenAI key without crashing when secrets.toml is missing
 def _get_openai_key() -> str | None:
@@ -279,10 +280,43 @@ def _format_model_metrics(models_output: dict | None) -> str:
 
     return "\n".join(lines)
 
+# --- Cache helper: use ML tab artifacts, do not retrain here ---
+def cached_ml_artifacts(df, dataset_name: str, target: str | None):
+    """
+    Returns (cache_valid, models_table_md, rf_importances).
+    Cache is valid iff ml_signature matches current settings and required fields exist.
+    """
+    if not target:
+        return False, "", None
+
+    excluded = st.session_state.get("ml_excluded_cols", [])
+    cv_used  = st.session_state.get("ml_cv_used", False)
+    cv_folds = st.session_state.get("ml_cv_folds", None)
+
+    current_sig = utils.ml_signature(
+        df,
+        dataset_name,
+        target,
+        excluded,
+        cv_used,
+        cv_folds,
+    )
+
+    cache_valid = (
+        st.session_state.get("ml_signature") == current_sig
+        and st.session_state.get("ml_output") is not None
+        and st.session_state.get("ml_models_table_md") is not None
+    )
+
+    if not cache_valid:
+        return False, "", None
+
+    return True, st.session_state.get("ml_models_table_md", ""), st.session_state.get("ml_rf_importances")
+
 def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
     """Streamlit UI for the LLM Report tab."""
     st.subheader("LLM Report Generation")
-
+    
     # Dataset name (prefill from uploaded filename if available)
     dataset_name = st.text_input("Dataset name", value=default_name)
 
@@ -290,10 +324,6 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
     include_modeling = st.checkbox("Include ML modeling in the report", value=False)
 
     target: Optional[str] = None
-    model_metrics = None
-
-    feature_importances = None  # will be filled from RF if available
-    rf_top_k = st.number_input("Top-N RF features to include", min_value=3, max_value=30, value=10, step=1)
 
     # --- Provider & model: read from unified sidebar (session_state), no UI here ---
     provider = st.session_state.get("llm_provider", "Ollama")
@@ -303,13 +333,6 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
 
     active_model = openai_model if provider == "OpenAI" else ollama_model
     st.caption(f"Provider: **{provider}** · Model: **{active_model}**")
-
-    def make_llm(provider_choice: str):
-        if provider_choice == "OpenAI":
-            if not openai_available:
-                raise RuntimeError("OpenAI not configured. Install `langchain_openai` and set `OPENAI_API_KEY`.")
-            return ChatOpenAI(model=openai_model, temperature=0.2)
-        return OllamaLLM(model=ollama_model)
 
     # LLM factory with graceful fallback + quota guard
     def make_llm(provider_choice: str):
@@ -332,50 +355,31 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
 
     if st.button("Generate Report"):
         with st.spinner("Analyzing dataset with AI..."):
-            # (A) If modeling requested, run it FIRST to build metrics + RF importances
-            if include_modeling and target:
-                out = run_models(df, target)  # returns task_type, results, text_summary
-                models_table_md = _format_model_metrics(out)
+            # 1) Decide modeling inputs (cache-only, no retrain here)
+            models_table_md = ""
+            feat_imps = None
 
-                # Build compact metrics dict for the prompt
-                metrics_dict = {}
-                if out["task_type"] == "classification":
-                    for model, m in out["results"].items():
-                        metrics_dict[model] = {
-                            "accuracy": round(m.get("accuracy", float("nan")), 3),
-                            "f1_weighted": round(m.get("f1_score", float("nan")), 3),
-                            "roc_auc": (round(m["roc_auc"], 3) if m.get("roc_auc") is not None else "na"),
-                        }
-                else:
-                    for model, m in out["results"].items():
-                        metrics_dict[model] = {
-                            "r2": round(m.get("r2_score", float("nan")), 3),
-                            "mae": round(m.get("mae", float("nan")), 3),
-                            "rmse": round(m.get("rmse", float("nan")), 3),
-                        }
-                model_metrics = metrics_dict
+            if include_modeling:
+                if not target:
+                    st.warning("Pick a target to include modeling.")
+                    st.stop()
+                valid, models_table_md, feat_imps = cached_ml_artifacts(df, dataset_name or "Dataset", target)
+                if not valid:
+                    st.info("No cached ML results for these settings. Run the models in the **ML Insights** tab first.")
+                    st.stop()
 
-                # RF importances (first RF found)
-                rf_importances = {}
-                for model_name, m in out["results"].items():
-                    imp = m.get("feature_importances", {})
-                    if isinstance(imp, dict) and imp and "Random Forest" in model_name:
-                        rf_importances = dict(sorted(imp.items(), key=lambda x: x[1], reverse=True)[:rf_top_k])
-                        break
-                feature_importances = rf_importances or None
-
-            # (B) Build the LLM and generate the report, with clean provider-specific errors
+            # 2) Build LLM and generate the report
             try:
-                llm = make_llm(provider)  # strict: no cross-provider fallback
+                llm = make_llm(provider)  # uses provider/model from sidebar
                 report_text = llm_report_tab(
                     df=df,
                     dataset_name=dataset_name or "Dataset",
-                    target=target,
-                    model_metrics=model_metrics,
-                    feature_importances=feature_importances,
-                    llm_model_name="mistral",  # only used if llm is None
+                    target=target if include_modeling else None,
+                    model_metrics=None,                  # table covers it
+                    feature_importances=feat_imps,       # RF importances from cache (may be None)
+                    llm_model_name="mistral",
                     top_k_corr=10,
-                    models_table_md=models_table_md,
+                    models_table_md=models_table_md,     # Markdown table from cache (or blank)
                     excluded_columns=st.session_state.get("ml_excluded_cols", []),
                     llm=llm,
                 )
@@ -387,7 +391,6 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
                     file_name=f"{dataset_name or 'dataset'}_report.md",
                     mime="text/markdown"
                 )
-
             except Exception as ex:
                 msg = str(ex)
                 if "insufficient_quota" in msg or "You exceeded your current quota" in msg:
@@ -398,47 +401,3 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
                     st.error("Ollama not installed or model `mistral` not pulled. Run: `ollama pull mistral`.")
                 else:
                     st.error(f"Report generation failed: {msg}")
-
-
-            # If modeling requested and target chosen, run models to get metrics text
-            if include_modeling and target:
-                out = run_models(df, target)  # returns task_type, results, text_summary
-                models_table_md = _format_model_metrics(out)
-                # Convert results into a compact metrics dict per model for the prompt
-                # Classification vs regression keys differ; handle both
-                metrics_dict = {}
-                if out["task_type"] == "classification":
-                    for model, m in out["results"].items():
-                        metrics_dict[model] = {
-                            "accuracy": round(m.get("accuracy", float("nan")), 3),
-                            "f1_weighted": round(m.get("f1_score", float("nan")), 3),
-                            "roc_auc": (round(m["roc_auc"], 3) if m.get("roc_auc") is not None else "na"),
-                        }
-                else:
-                    for model, m in out["results"].items():
-                        metrics_dict[model] = {
-                            "r2": round(m.get("r2_score", float("nan")), 3),
-                            "mae": round(m.get("mae", float("nan")), 3),
-                            "rmse": round(m.get("rmse", float("nan")), 3),
-                        }
-                model_metrics = metrics_dict
-
-                # ---- Extract RF importances for the prompt (first RF with data) ----
-                rf_importances = {}
-                for model_name, m in out["results"].items():
-                    imp = m.get("feature_importances", {})
-                    if isinstance(imp, dict) and len(imp) > 0 and "Random Forest" in model_name:
-                        rf_importances = dict(sorted(imp.items(), key=lambda x: x[1], reverse=True)[:rf_top_k])
-                        break
-                feature_importances = rf_importances or None
-
-                
-            if report_text:
-                st.subheader("Generated Report")
-                st.markdown(report_text)
-                st.download_button(
-                    label="Download report (Markdown)",
-                    data=report_text.encode("utf-8"),
-                    file_name=f"{dataset_name or 'dataset'}_report.md",
-                    mime="text/markdown"
-                )
