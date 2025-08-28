@@ -112,13 +112,13 @@ if st.session_state.df is not None:
 
         if df is not None:
             target = st.selectbox("Select target variable",df.columns,
-                help="This is the column you want to predict. For classification, pick a discrete label (e.g., Survived). For regression, pick a numeric target.")
+                help="This is the column the model will try to predict. Pick a categorical column for classification (e.g., Yes/No) or a numeric column for regression (e.g., Price).")
             # the target was saved when selected in the ML tab to be used in Mutual Information section of the EDA. Not being used right now.
             st.session_state["ml_target"] = target
 
             # the option to exclude columns from modeling (e.g. IDs, free text, obvious leakage)
             all_features = [c for c in df.columns if c != target]
-            exclude_cols = st.multiselect("Exclude columns from modeling",options=all_features,key="ml_exclude_cols",help="Optional: remove identifiers, free text, or any columns that would leak the target.")
+            exclude_cols = st.multiselect("Exclude columns from modeling",options=all_features,key="ml_exclude_cols",help="Optional: exclude columns that do not help prediction (e.g., IDs, names, free text) or that could leak the target (e.g., a duplicate of the outcome column).")
 
             dataset_name = st.session_state.get("dataset_name", "dataset")
             excel_pref = "on" if st.session_state.get("dl_excel_global") else "off"
@@ -135,7 +135,7 @@ if st.session_state.df is not None:
                         f"Use {cv_folds}-fold cross-validation (metrics only)",
                         value=False,
                         key="ml_use_cv",
-                        help="Reports mean±std scores across folds. Turn OFF to see the single 80/20 split with diagnostic plots."
+                        help="Cross-validation splits your data into multiple folds to give more reliable performance estimates. It takes longer to run but reduces the risk of overfitting to a single split. Reports mean ± std scores across folds. Turn OFF to use a single 80/20 split and view diagnostic plots."
                     )
 
                     # # toggle to choose to use k fold cross validation

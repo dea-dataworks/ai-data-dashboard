@@ -384,7 +384,7 @@ def show_boxplot(df: pd.DataFrame) -> None:
             lw=params["lw"],
             grid_axis="y",
         )
-        st.pyplot(fig, use_container_width=not compact)
+        st.pyplot(fig, use_container_width=False)
         plt.close(fig)
 
 # --- Value counts for categorical columns ---
