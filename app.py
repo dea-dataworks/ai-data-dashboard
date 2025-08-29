@@ -161,10 +161,6 @@ if st.session_state.df is not None:
 
             if not target:
                 st.info("Select a target, configure exclusions/CV, then click **Run models**.")
-                st.stop()
-
-            if not run_clicked:
-                st.stop()
                             
             if target:
                 try:
