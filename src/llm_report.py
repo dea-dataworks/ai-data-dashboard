@@ -1,11 +1,9 @@
 from typing import Dict, Any, Optional, List
 import numpy as np
 import pandas as pd
-
 import os
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-
 import streamlit as st
 import src.utils as utils
 from langchain_ollama import OllamaLLM
@@ -14,8 +12,6 @@ try:
     _OPENAI_OK = True
 except Exception:
     _OPENAI_OK = False
-
-
 
 # ---- Safe helper: get OpenAI key without crashing when secrets.toml is missing
 def _get_openai_key() -> str | None:
@@ -399,67 +395,110 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
         target = st.selectbox("Select target column", options=list(df.columns))
         st.caption("Tip: choose your label column for classification/regression.")
      
-    
-    # Generate Report
-    models_table_md = ""
-    report_text = None
+    # ---- PRE-CHECK ----
+    status, models_table_md, feat_imps, ctx = ("ok", "", None, {})
+    if include_modeling:
+        status, models_table_md, feat_imps, ctx = cached_ml_artifacts(df, dataset_name or "Dataset", target)
+        if status == "no_target":
+            st.warning("Pick a target to include modeling.")
+        elif status == "no_ml":
+            st.info("No cached ML results yet. Please run models in **ML Insights** first.")
+        elif status == "missing_table":
+            st.info("Cached metrics table is missing. Please re-run models in **ML Insights**.")
+        elif status == "mismatch":
+            st.info(f"ML cache is out of date ({ctx.get('reason','settings changed')}). Please re-run models in **ML Insights**.")
+    else:
+        st.caption("Tip: Leave modeling off to generate an EDA-only report.")
 
+    # ---- BUTTON (use status computed above) ----
     if st.button("Generate Report"):
+        if include_modeling and status != "ok":
+            st.stop()
         with st.spinner("Analyzing dataset with AI..."):
-            # 1) Decide modeling inputs (cache-only, no retrain here)
-            models_table_md = ""
-            feat_imps = None
+            report_text = llm_report_tab(
+                df=df,
+                dataset_name=dataset_name or "Dataset",
+                target=target if include_modeling else None,
+                feature_importances=feat_imps if include_modeling else None,
+                models_table_md=models_table_md if include_modeling else "",
+                excluded_columns=st.session_state.get("ml_excluded_cols", []),
+                llm=make_llm(provider),
+            )
+            st.session_state["llm_report_text"] = report_text
 
-            if include_modeling:
-                status, models_table_md, feat_imps, ctx = cached_ml_artifacts(
-                    df, dataset_name or "Dataset", target
-                )
+    # ---- ALWAYS SHOW LAST REPORT ----
+    if st.session_state.get("llm_report_text"):
+        st.subheader("Generated Report")
+        st.markdown(st.session_state["llm_report_text"])
+        st.download_button(
+            "Download report (Markdown)",
+            data=st.session_state["llm_report_text"].encode("utf-8"),
+            file_name=f"{dataset_name or 'dataset'}_report.md",
+            mime="text/markdown",
+        )
+    else:
+        st.info("No report yet. Configure options and click **Generate Report**.")
 
-                if status == "no_target":
-                    st.warning("Pick a target to include modeling.")
-                    st.stop()
-                elif status == "no_ml":
-                    st.info("No cached ML results yet. Please run models in **ML Insights** first.")
-                    st.stop()
-                elif status == "missing_table":
-                    st.info("Cached metrics table is missing. Please re-run models in **ML Insights**.")
-                    st.stop()
-                elif status == "mismatch":
-                    reason = ctx.get("reason", "settings changed")
-                    st.info(f"ML cache is out of date ({reason}). Please re-run models in **ML Insights**.")
-                    st.stop()
-                # if status == "ok": continue and generate report
+    # # Generate Report
+    # models_table_md = ""
+    # report_text = None
 
-            # 2) Build LLM and generate the report
-            try:
-                llm = make_llm(provider)  # uses provider/model from sidebar
-                report_text = llm_report_tab(
-                    df=df,
-                    dataset_name=dataset_name or "Dataset",
-                    target=target if include_modeling else None,
-                    model_metrics=None,                  # table covers it
-                    feature_importances=feat_imps,       # RF importances from cache (may be None)
-                    llm_model_name="mistral",
-                    top_k_corr=10,
-                    models_table_md=models_table_md,     # Markdown table from cache (or blank)
-                    excluded_columns=st.session_state.get("ml_excluded_cols", []),
-                    llm=llm,
-                )
-                st.subheader("Generated Report")
-                st.markdown(report_text)
-                st.download_button(
-                    label="Download report (Markdown)",
-                    data=report_text.encode("utf-8"),
-                    file_name=f"{dataset_name or 'dataset'}_report.md",
-                    mime="text/markdown"
-                )
-            except Exception as ex:
-                msg = str(ex)
-                if "insufficient_quota" in msg or "You exceeded your current quota" in msg:
-                    st.error("OpenAI quota exceeded. Add credits to your account or switch provider to **Ollama**.")
-                elif "OpenAI not configured" in msg or "langchain_openai" in msg:
-                    st.error("OpenAI is not configured. Install `langchain_openai` and set `OPENAI_API_KEY`.")
-                elif "Ollama not available" in msg or "mistral" in msg:
-                    st.error("Ollama not installed or model `mistral` not pulled. Run: `ollama pull mistral`.")
-                else:
-                    st.error(f"Report generation failed: {msg}")
+    # if st.button("Generate Report"):
+    #     with st.spinner("Analyzing dataset with AI..."):
+    #         # 1) Decide modeling inputs (cache-only, no retrain here)
+    #         models_table_md = ""
+    #         feat_imps = None
+
+    #         if include_modeling:
+    #             status, models_table_md, feat_imps, ctx = cached_ml_artifacts(
+    #                 df, dataset_name or "Dataset", target
+    #             )
+
+    #             if status == "no_target":
+    #                 st.warning("Pick a target to include modeling.")
+    #                 st.stop()
+    #             elif status == "no_ml":
+    #                 st.info("No cached ML results yet. Please run models in **ML Insights** first.")
+    #                 st.stop()
+    #             elif status == "missing_table":
+    #                 st.info("Cached metrics table is missing. Please re-run models in **ML Insights**.")
+    #                 st.stop()
+    #             elif status == "mismatch":
+    #                 reason = ctx.get("reason", "settings changed")
+    #                 st.info(f"ML cache is out of date ({reason}). Please re-run models in **ML Insights**.")
+    #                 st.stop()
+    #             # if status == "ok": continue and generate report
+
+    #         # 2) Build LLM and generate the report
+    #         try:
+    #             llm = make_llm(provider)  # uses provider/model from sidebar
+    #             report_text = llm_report_tab(
+    #                 df=df,
+    #                 dataset_name=dataset_name or "Dataset",
+    #                 target=target if include_modeling else None,
+    #                 model_metrics=None,                  # table covers it
+    #                 feature_importances=feat_imps,       # RF importances from cache (may be None)
+    #                 llm_model_name="mistral",
+    #                 top_k_corr=10,
+    #                 models_table_md=models_table_md,     # Markdown table from cache (or blank)
+    #                 excluded_columns=st.session_state.get("ml_excluded_cols", []),
+    #                 llm=llm,
+    #             )
+    #             st.subheader("Generated Report")
+    #             st.markdown(report_text)
+    #             st.download_button(
+    #                 label="Download report (Markdown)",
+    #                 data=report_text.encode("utf-8"),
+    #                 file_name=f"{dataset_name or 'dataset'}_report.md",
+    #                 mime="text/markdown"
+    #             )
+    #         except Exception as ex:
+    #             msg = str(ex)
+    #             if "insufficient_quota" in msg or "You exceeded your current quota" in msg:
+    #                 st.error("OpenAI quota exceeded. Add credits to your account or switch provider to **Ollama**.")
+    #             elif "OpenAI not configured" in msg or "langchain_openai" in msg:
+    #                 st.error("OpenAI is not configured. Install `langchain_openai` and set `OPENAI_API_KEY`.")
+    #             elif "Ollama not available" in msg or "mistral" in msg:
+    #                 st.error("Ollama not installed or model `mistral` not pulled. Run: `ollama pull mistral`.")
+    #             else:
+    #                 st.error(f"Report generation failed: {msg}")

@@ -122,18 +122,50 @@ if st.session_state.df is not None:
         st.subheader("Machine Learning")
 
         if df is not None:
-            target = st.selectbox("Select target variable",df.columns,
-                help="This is the column the model will try to predict. Pick a categorical column for classification (e.g., Yes/No) or a numeric column for regression (e.g., Price).")
-            # the target was saved when selected in the ML tab to be used in Mutual Information section of the EDA. Not being used right now.
-            st.session_state["ml_target"] = target
+            # --- 1) Target select: start EMPTY (no auto-run) ---
+            target_choices = ["— Select target —"] + list(df.columns)
+            target_sel = st.selectbox(
+                "Select target variable",
+                target_choices,
+                index=0,
+                #help="Pick the column to predict. Choose a categorical label for classification or a numeric one for regression."
+                help = "This is the column the model will try to predict. Pick a categorical column for classification (e.g., Yes/No) or a numeric column for regression (e.g., Price)."
+            )
 
-            # the option to exclude columns from modeling (e.g. IDs, free text, obvious leakage)
-            all_features = [c for c in df.columns if c != target]
-            exclude_cols = st.multiselect("Exclude columns from modeling",options=all_features,key="ml_exclude_cols",help="Optional: exclude columns that do not help prediction (e.g., IDs, names, free text) or that could leak the target (e.g., a duplicate of the outcome column).")
+            # Exclusions enabled regardless of run (so user can prep config first)
+            all_features = [c for c in df.columns if c != target_sel and c != "— Select target —"]
+            exclude_cols = st.multiselect(
+                "Exclude columns from modeling",
+                options=all_features,
+                key="ml_exclude_cols",
+                help="Optional: exclude columns that do not help prediction (e.g., IDs, names, free text) or that could leak the target (e.g., a duplicate of the outcome column)."
+            )
 
             dataset_name = st.session_state.get("dataset_name", "dataset")
-            excel_pref = "on" if st.session_state.get("dl_excel_global") else "off"
-            
+            excel_pref   = "on" if st.session_state.get("dl_excel_global") else "off"
+            cv_folds     = int(st.session_state.get("cv_folds", 5))
+
+            use_cv = st.checkbox(
+                f"Use {cv_folds}-fold cross-validation (metrics only)",
+                value=False,
+                key="ml_use_cv",
+                help="Cross-validation splits your data into multiple folds to give more reliable performance estimates. It takes longer to run but reduces the risk of overfitting to a single split. Reports mean ± std scores across folds. Turn OFF to use a single 80/20 split and view diagnostic plots"
+            )
+       
+            # --- 2) Require explicit click to run ---
+            run_clicked = st.button("Run models")
+
+            # Persist the *chosen* target only if it’s a real selection
+            target = target_sel if target_sel != "— Select target —" else None
+            st.session_state["ml_target"] = target  # keep for EDA warnings, etc.
+
+            if not target:
+                st.info("Select a target, configure exclusions/CV, then click **Run models**.")
+                st.stop()
+
+            if not run_clicked:
+                st.stop()
+                            
             if target:
                 try:
                     # Preprocess (safe step: drops high-cardinality, splits X/y)
@@ -141,13 +173,6 @@ if st.session_state.df is not None:
                     st.session_state["ml_excluded_cols"] = exclude_cols
 
                     cv_folds = int(st.session_state.get("cv_folds", 5))
-
-                    use_cv = st.checkbox(
-                        f"Use {cv_folds}-fold cross-validation (metrics only)",
-                        value=False,
-                        key="ml_use_cv",
-                        help="Cross-validation splits your data into multiple folds to give more reliable performance estimates. It takes longer to run but reduces the risk of overfitting to a single split. Reports mean ± std scores across folds. Turn OFF to use a single 80/20 split and view diagnostic plots."
-                    )
 
                     if use_cv:
                         cv_out = ml.cross_validate_models(X, y, cv_splits=cv_folds)
