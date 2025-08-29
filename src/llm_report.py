@@ -414,6 +414,8 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
                 st.info("Cached metrics table is missing. Please re-run models in **ML Insights**.")
             elif status == "mismatch":
                 st.info(f"ML cache is out of date ({ctx.get('reason','settings changed')}). Please re-run models in **ML Insights**.")
+            elif status == "ok":
+                st.caption("Using results from **ML Insights** (last run).")
     else:
         st.caption("Tip: Leave modeling off to generate an EDA-only report.")
 

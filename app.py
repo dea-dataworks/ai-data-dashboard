@@ -186,10 +186,7 @@ if st.session_state.df is not None:
             if not target:
                 st.info("Select a target, configure exclusions/CV, then click **Run models**.")
 
-            elif not should_render:
-                st.info("Ready. Click **Run models** to train/evaluate with the current settings.")
-
-            else:
+            elif should_render:
                 try:
                     # --- Prepare data only if we will train now (no need when using cache) ---
                     if not use_cache:
@@ -216,7 +213,6 @@ if st.session_state.df is not None:
                             # Build a Markdown table expected by the LLM tab
                             try:
                                 # Construct a per-task DataFrame then to_markdown
-                                import pandas as pd
                                 rows = []
                                 for model, m in cv_out["results"].items():
                                     if task_type == "classification":
@@ -233,8 +229,13 @@ if st.session_state.df is not None:
                                             "MAE (mean±std)": f"{m['mae_mean']:.3f} ± {m['mae_std']:.3f}",
                                             "RMSE (mean±std)": f"{m['rmse_mean']:.3f} ± {m['rmse_std']:.3f}",
                                         })
-                                cv_df_for_md = pd.DataFrame(rows)
-                                st.session_state["ml_models_table_md"] = cv_df_for_md.to_markdown(index=False)
+                                
+                                #REVIEW
+                                #cv_df_for_md = pd.DataFrame(rows)
+                                #st.session_state["ml_models_table_md"] = cv_df_for_md.to_markdown(index=False)
+
+                                cv_df = pd.DataFrame(rows)
+                                st.session_state["ml_models_table_md"] = (cv_df.to_markdown(index=False) if not cv_df.empty else "")
                             except Exception:
                                 st.session_state["ml_models_table_md"] = ""
 
@@ -249,29 +250,35 @@ if st.session_state.df is not None:
                                 seed=st.session_state.get("global_seed"),
                             )
 
-                        # ---- Render CV summary table (no diagnostics plots by design) ----
-                        import pandas as pd
-                        rows = []
-                        for model, m in cv_out["results"].items():
-                            if task_type == "classification":
-                                rows.append({
-                                    "Model": model,
-                                    "Accuracy (mean±std)": f"{m['accuracy_mean']:.3f} ± {m['accuracy_std']:.3f}",
-                                    "F1 weighted (mean±std)": f"{m['f1_mean']:.3f} ± {m['f1_std']:.3f}",
-                                    "ROC AUC (mean±std)": ("—" if m["roc_auc_mean"] is None else f"{m['roc_auc_mean']:.3f} ± {m['roc_auc_std']:.3f}"),
-                                })
-                            else:
-                                rows.append({
-                                    "Model": model,
-                                    "R² (mean±std)": f"{m['r2_mean']:.3f} ± {m['r2_std']:.3f}",
-                                    "MAE (mean±std)": f"{m['mae_mean']:.3f} ± {m['mae_std']:.3f}",
-                                    "RMSE (mean±std)": f"{m['rmse_mean']:.3f} ± {m['rmse_std']:.3f}",
-                                })
-                        cv_df = pd.DataFrame(rows).set_index("Model") if rows else pd.DataFrame()
+                        # # ---- Render CV summary table (no diagnostics plots by design) ----
+                        # rows = []
+                        # for model, m in cv_out["results"].items():
+                        #     if task_type == "classification":
+                        #         rows.append({
+                        #             "Model": model,
+                        #             "Accuracy (mean±std)": f"{m['accuracy_mean']:.3f} ± {m['accuracy_std']:.3f}",
+                        #             "F1 weighted (mean±std)": f"{m['f1_mean']:.3f} ± {m['f1_std']:.3f}",
+                        #             "ROC AUC (mean±std)": ("—" if m["roc_auc_mean"] is None else f"{m['roc_auc_mean']:.3f} ± {m['roc_auc_std']:.3f}"),
+                        #         })
+                        #     else:
+                        #         rows.append({
+                        #             "Model": model,
+                        #             "R² (mean±std)": f"{m['r2_mean']:.3f} ± {m['r2_std']:.3f}",
+                        #             "MAE (mean±std)": f"{m['mae_mean']:.3f} ± {m['mae_std']:.3f}",
+                        #             "RMSE (mean±std)": f"{m['rmse_mean']:.3f} ± {m['rmse_std']:.3f}",
+                        #         })
+                        # cv_df = pd.DataFrame(rows).set_index("Model") if rows else pd.DataFrame()
+
+                        # st.write(f"### Detected Task: {task_type.capitalize()} ({cv_folds}-fold CV)")
+                        # if not cv_df.empty:
+                        #     st.table(cv_df)
+                        #     df_download_buttons("cv-metrics", cv_df, base=dataset_name, excel=excel_pref)
+                        # else:
+                        #     st.info("No CV metrics to display.")
 
                         st.write(f"### Detected Task: {task_type.capitalize()} ({cv_folds}-fold CV)")
                         if not cv_df.empty:
-                            st.table(cv_df)
+                            st.table(cv_df.set_index("Model"))
                             df_download_buttons("cv-metrics", cv_df, base=dataset_name, excel=excel_pref)
                         else:
                             st.info("No CV metrics to display.")
@@ -329,8 +336,6 @@ if st.session_state.df is not None:
 
                         # ---- Classification ----
                         if task_type == "classification":
-                            import pandas as pd, matplotlib.pyplot as plt
-
                             summary_data = []
                             for model, metrics in output["results"].items():
                                 if "classification_report" in metrics and isinstance(metrics["classification_report"], dict):
@@ -375,7 +380,6 @@ if st.session_state.df is not None:
 
                             # Diagnostics
                             with st.expander("📊 Model Diagnostics (Visuals)"):
-                                import pandas as pd
                                 st.caption("Visual plots to help interpret classification performance.")
                                 for model, metrics in output["results"].items():
                                     preds = metrics.get("preds")
@@ -412,17 +416,15 @@ if st.session_state.df is not None:
 
                             with st.expander("📖 Metric Definitions"):
                                 st.markdown("""
-            - **Accuracy**: Proportion of correctly classified samples.
-            - **F1 Score (weighted)**: Harmonic mean of precision and recall, weighted by class frequency.
-            - **ROC AUC**: Measures how well the model separates classes.
-            - **Precision**: Among predicted positives, proportion actually positive.
-            - **Recall**: Among actual positives, proportion predicted correctly.
-            """)
+                                - **Accuracy**: Proportion of correctly classified samples.
+                                - **F1 Score (weighted)**: Harmonic mean of precision and recall, weighted by class frequency.
+                                - **ROC AUC**: Measures how well the model separates classes.
+                                - **Precision**: Among predicted positives, proportion actually positive.
+                                - **Recall**: Among actual positives, proportion predicted correctly.
+                                """)
 
                         # ---- Regression ----
                         elif task_type == "regression":
-                            import pandas as pd, matplotlib.pyplot as plt
-
                             summary_data = []
                             for model, metrics in output["results"].items():
                                 summary_data.append({
@@ -505,6 +507,9 @@ if st.session_state.df is not None:
                     st.error(str(e))
                 except Exception as e:
                     st.error(f"Unexpected error: {e}")
+            
+            else:
+                st.info("Ready. Click **Run models** to train/evaluate with the current settings.")
 
 
            
