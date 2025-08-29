@@ -13,19 +13,8 @@ import src.llm_report as llm_report
 from src.utils import df_download_buttons, fig_download_button
 from src import utils
 
-
-
-
 # import matplotlib as mpl
 from matplotlib import font_manager as fm
-
-# fam = mpl.rcParams.get("font.family", ["sans-serif"])
-# print("Font family set to:", fam)
-# resolved = fm.FontProperties(family=fam).get_name()
-# print("Matplotlib actually using:", resolved)
-
-
-
 
 # Set page configuration
 st.set_page_config(page_title="AI Data Insight Dashboard", layout="wide")
@@ -89,7 +78,7 @@ if st.session_state.df is not None:
 
     with tab2:
         st.subheader("Exploratory Data Analysis")
-        # Open these by default for quick context
+        
         with st.expander("Data Quality Warnings", expanded=True):
             eda.show_data_quality_warnings(df, target=st.session_state.get("ml_target"))
 

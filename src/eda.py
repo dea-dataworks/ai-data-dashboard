@@ -46,10 +46,13 @@ def get_style_params(compact: bool) -> dict:
     Note: In two-column layouts (ML diagnostics), Streamlit width is fixed by the column,
     so figsize differences won't be noticeable — that's expected.
     """
-    BINS = 30  # <-- unified bins (the only real change)
+    BINS = 30           # unified bins (the only real change)
+    #BASE = (7.8, 4.4)   # one medium baseline for everything
 
     return {
-        "figsize": (6.5, 3.6) if compact else (8.8, 4.8),   
+        #"figsize": (6.5, 3.6) if compact else (8.8, 4.8),
+        #"figsize": (BASE[0]*0.90, BASE[1]*0.90) if compact else BASE,  
+        "figsize": (6.2, 3.5) if compact else (9.2, 5.2),  
         "dpi": 120,
         "title_fs": 12 if compact else 14,
         "label_fs": 10 if compact else 12,
