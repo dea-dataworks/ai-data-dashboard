@@ -141,6 +141,8 @@ if st.session_state.df is not None:
                 help="Optional: exclude columns that do not help prediction (e.g., IDs, names, free text) or that could leak the target (e.g., a duplicate of the outcome column)."
             )
 
+            st.session_state["ml_excluded_cols"] = exclude_cols
+
             dataset_name = st.session_state.get("dataset_name", "dataset")
             excel_pref   = "on" if st.session_state.get("dl_excel_global") else "off"
             cv_folds     = int(st.session_state.get("cv_folds", 5))
@@ -151,6 +153,9 @@ if st.session_state.df is not None:
                 key="ml_use_cv",
                 help="Cross-validation splits your data into multiple folds to give more reliable performance estimates. It takes longer to run but reduces the risk of overfitting to a single split. Reports mean ± std scores across folds. Turn OFF to use a single 80/20 split and view diagnostic plots"
             )
+
+            st.session_state["ml_cv_used"]  = use_cv
+            st.session_state["ml_cv_folds"] = cv_folds
        
             # --- 2) Require explicit click to run ---
             run_clicked = st.button("Run models")
@@ -168,7 +173,7 @@ if st.session_state.df is not None:
                 try:
                     # Preprocess (safe step: drops high-cardinality, splits X/y)
                     X, y = data_preprocess.preprocess_df(df, target, exclude=exclude_cols)
-                    st.session_state["ml_excluded_cols"] = exclude_cols
+                    #t.session_state["ml_excluded_cols"] = exclude_cols
 
                     cv_folds = int(st.session_state.get("cv_folds", 5))
 
