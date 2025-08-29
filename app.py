@@ -157,131 +157,186 @@ if st.session_state.df is not None:
             st.session_state["ml_cv_used"]  = use_cv
             st.session_state["ml_cv_folds"] = cv_folds
        
-            # --- 2) Require explicit click to run ---
-            run_clicked = st.button("Run models")
+            # --- 2) Require explicit click to run, but allow valid cache to re-render ---
+            clicked = st.button("Run models")
 
             # Persist the *chosen* target only if it’s a real selection
             target = target_sel if target_sel != "— Select target —" else None
             st.session_state["ml_target"] = target  # keep for EDA warnings, etc.
 
+            # Build the current signature and see if we already have a matching cache
+            current_sig = utils.ml_signature(
+                df,
+                st.session_state.get("dataset_name", "dataset"),
+                target,
+                exclude_cols,
+                cv_used=use_cv,
+                cv_folds=(cv_folds if use_cv else None),
+                seed=st.session_state.get("global_seed"),
+            )
+            valid_cache = (
+                st.session_state.get("ml_output") is not None
+                and st.session_state.get("ml_signature") == current_sig
+            )
+
+            # We render if the user clicked OR (no click) but the cache matches
+            should_render = clicked or valid_cache
+            use_cache     = (not clicked) and valid_cache
+
             if not target:
                 st.info("Select a target, configure exclusions/CV, then click **Run models**.")
 
-            elif not run_clicked:
+            elif not should_render:
                 st.info("Ready. Click **Run models** to train/evaluate with the current settings.")
+
             else:
                 try:
-                    # Preprocess (safe step: drops high-cardinality, splits X/y)
-                    X, y = data_preprocess.preprocess_df(df, target, exclude=exclude_cols)
-                    #t.session_state["ml_excluded_cols"] = exclude_cols
+                    # --- Prepare data only if we will train now (no need when using cache) ---
+                    if not use_cache:
+                        X, y = data_preprocess.preprocess_df(df, target, exclude=exclude_cols)
+                        st.session_state["ml_excluded_cols"] = exclude_cols  # keep as before
 
-                    cv_folds = int(st.session_state.get("cv_folds", 5))
-
+                    # =========================
+                    # ====== CV PATH ==========
+                    # =========================
                     if use_cv:
-                        cv_out = ml.cross_validate_models(X, y, cv_splits=cv_folds)
-                        task_type = cv_out["task_type"]
-                        st.write(f"### Detected Task: {task_type.capitalize()} ({cv_folds}-fold CV)")
+                        if use_cache:
+                            cv_out    = st.session_state["ml_output"]
+                            task_type = cv_out["task_type"]
+                        else:
+                            cv_out    = ml.cross_validate_models(X, y, cv_splits=cv_folds)
+                            task_type = cv_out["task_type"]
 
-                        # --- Build cv_df inside each task branch ---
-                        if task_type == "classification":
-                            rows = []
-                            for model, m in cv_out["results"].items():
+                            # --- Cache outputs + signature for re-render ---
+                            st.session_state["ml_output"]    = cv_out
+                            st.session_state["ml_target"]    = target
+                            st.session_state["ml_excluded_cols"] = exclude_cols
+                            st.session_state["ml_cv_used"]   = True
+                            st.session_state["ml_cv_folds"]  = cv_folds
+                            # Build a Markdown table expected by the LLM tab
+                            try:
+                                # Construct a per-task DataFrame then to_markdown
+                                import pandas as pd
+                                rows = []
+                                for model, m in cv_out["results"].items():
+                                    if task_type == "classification":
+                                        rows.append({
+                                            "Model": model,
+                                            "Accuracy (mean±std)": f"{m['accuracy_mean']:.3f} ± {m['accuracy_std']:.3f}",
+                                            "F1 weighted (mean±std)": f"{m['f1_mean']:.3f} ± {m['f1_std']:.3f}",
+                                            "ROC AUC (mean±std)": ("—" if m["roc_auc_mean"] is None else f"{m['roc_auc_mean']:.3f} ± {m['roc_auc_std']:.3f}")
+                                        })
+                                    else:
+                                        rows.append({
+                                            "Model": model,
+                                            "R² (mean±std)": f"{m['r2_mean']:.3f} ± {m['r2_std']:.3f}",
+                                            "MAE (mean±std)": f"{m['mae_mean']:.3f} ± {m['mae_std']:.3f}",
+                                            "RMSE (mean±std)": f"{m['rmse_mean']:.3f} ± {m['rmse_std']:.3f}",
+                                        })
+                                cv_df_for_md = pd.DataFrame(rows)
+                                st.session_state["ml_models_table_md"] = cv_df_for_md.to_markdown(index=False)
+                            except Exception:
+                                st.session_state["ml_models_table_md"] = ""
+
+                            st.session_state["ml_rf_importances"] = None  # CV path: not computed
+                            st.session_state["ml_signature"] = utils.ml_signature(
+                                df,
+                                st.session_state.get("dataset_name", "dataset"),
+                                target,
+                                exclude_cols,
+                                cv_used=True,
+                                cv_folds=cv_folds,
+                                seed=st.session_state.get("global_seed"),
+                            )
+
+                        # ---- Render CV summary table (no diagnostics plots by design) ----
+                        import pandas as pd
+                        rows = []
+                        for model, m in cv_out["results"].items():
+                            if task_type == "classification":
                                 rows.append({
                                     "Model": model,
                                     "Accuracy (mean±std)": f"{m['accuracy_mean']:.3f} ± {m['accuracy_std']:.3f}",
                                     "F1 weighted (mean±std)": f"{m['f1_mean']:.3f} ± {m['f1_std']:.3f}",
-                                    "ROC AUC (mean±std)": ("—" if m["roc_auc_mean"] is None else f"{m['roc_auc_mean']:.3f} ± {m['roc_auc_std']:.3f}")
+                                    "ROC AUC (mean±std)": ("—" if m["roc_auc_mean"] is None else f"{m['roc_auc_mean']:.3f} ± {m['roc_auc_std']:.3f}"),
                                 })
-                            cv_df = pd.DataFrame(rows).set_index("Model")
-                        else:  # regression
-                            rows = []
-                            for model, m in cv_out["results"].items():
+                            else:
                                 rows.append({
                                     "Model": model,
                                     "R² (mean±std)": f"{m['r2_mean']:.3f} ± {m['r2_std']:.3f}",
                                     "MAE (mean±std)": f"{m['mae_mean']:.3f} ± {m['mae_std']:.3f}",
                                     "RMSE (mean±std)": f"{m['rmse_mean']:.3f} ± {m['rmse_std']:.3f}",
                                 })
-                            cv_df = pd.DataFrame(rows).set_index("Model")
+                        cv_df = pd.DataFrame(rows).set_index("Model") if rows else pd.DataFrame()
 
-                         # --- Common render + downloads (once) ---
-                        st.table(cv_df)
-                        df_download_buttons("cv-metrics", cv_df, base=dataset_name, excel=excel_pref)
+                        st.write(f"### Detected Task: {task_type.capitalize()} ({cv_folds}-fold CV)")
+                        if not cv_df.empty:
+                            st.table(cv_df)
+                            df_download_buttons("cv-metrics", cv_df, base=dataset_name, excel=excel_pref)
+                        else:
+                            st.info("No CV metrics to display.")
 
-                        # --- Common cache (once) ---
-                        st.session_state["ml_output"] = cv_out
-                        st.session_state["ml_target"] = target
-                        st.session_state["ml_excluded_cols"] = exclude_cols
-                        st.session_state["ml_cv_used"] = True
-                        st.session_state["ml_cv_folds"] = cv_folds
-                        try:
-                            st.session_state["ml_models_table_md"] = cv_df.to_markdown()
-                        except Exception:
-                            st.session_state["ml_models_table_md"] = ""
-                        st.session_state["ml_rf_importances"] = None  # CV path: not computed
-                        st.session_state["ml_signature"] = utils.ml_signature(
-                            df,
-                            st.session_state.get("dataset_name", "dataset"),
-                            target,
-                            exclude_cols,
-                            cv_used=True,
-                            cv_folds=cv_folds,
-                            seed=st.session_state.get("global_seed"),
-                            )
-                        
                         st.info("Cross-validation shows typical performance across folds. Turn off the checkbox to view the single 80/20 split and diagnostics plots.")
+
+                    # ==============================
+                    # ===== Single-split PATH ======
+                    # ==============================
                     else:
-                        # Train models + evaluate
-                        output = ml.train_and_evaluate(X, y, target)
-                        # --- Cache for LLM Report (single 80/20 run) ---
-                        st.session_state["ml_output"] = output
-                        st.session_state["ml_target"] = target
-                        st.session_state["ml_excluded_cols"] = exclude_cols
-                        st.session_state["ml_cv_used"] = False
-                        st.session_state["ml_cv_folds"] = None
+                        if use_cache:
+                            output    = st.session_state["ml_output"]
+                            task_type = output["task_type"]
+                            y_test    = output["y_test"]
+                        else:
+                            output    = ml.train_and_evaluate(X, y, target)
+                            task_type = output["task_type"]
+                            y_test    = output["y_test"]
 
-                        # Metrics table in the same format the Report tab expects
-                        try:
-                            st.session_state["ml_models_table_md"] = llm_report._format_model_metrics(output)
-                        except Exception:
-                            st.session_state["ml_models_table_md"] = ""
+                            # --- Cache outputs + signature for re-render ---
+                            st.session_state["ml_output"]    = output
+                            st.session_state["ml_target"]    = target
+                            st.session_state["ml_excluded_cols"] = exclude_cols
+                            st.session_state["ml_cv_used"]   = False
+                            st.session_state["ml_cv_folds"]  = None
 
-                        # Extract one set of feature importances (e.g., Random Forest) for the report
-                        rf_top_k = 10
-                        rf_importances = {}
-                        for model_name, m in output.get("results", {}).items():
-                            imp = m.get("feature_importances", {})
-                            if isinstance(imp, dict) and imp:
-                                # take the first model with importances (typically Random Forest)
-                                rf_importances = dict(sorted(imp.items(), key=lambda x: x[1], reverse=True)[:rf_top_k])
-                                break
-                        st.session_state["ml_rf_importances"] = rf_importances or None
+                            # Metrics table in the same format the Report tab expects
+                            try:
+                                st.session_state["ml_models_table_md"] = llm_report._format_model_metrics(output)
+                            except Exception:
+                                st.session_state["ml_models_table_md"] = ""
 
-                        # Signature
-                        st.session_state["ml_signature"] = utils.ml_signature(
-                            df,
-                            st.session_state.get("dataset_name", "dataset"),
-                            target,
-                            exclude_cols,
-                            cv_used=False,
-                            cv_folds=None,
-                            seed=st.session_state.get("global_seed"),
-                        )
-                        
-                        task_type = output["task_type"]
-                        y_test = output["y_test"]
+                            # Extract one set of feature importances (e.g., Random Forest) for the report
+                            rf_top_k = 10
+                            rf_importances = {}
+                            for model_name, m in output.get("results", {}).items():
+                                imp = m.get("feature_importances", {})
+                                if isinstance(imp, dict) and imp:
+                                    rf_importances = dict(sorted(imp.items(), key=lambda x: x[1], reverse=True)[:rf_top_k])
+                                    break
+                            st.session_state["ml_rf_importances"] = rf_importances or None
+
+                            # Signature
+                            st.session_state["ml_signature"] = utils.ml_signature(
+                                df,
+                                st.session_state.get("dataset_name", "dataset"),
+                                target,
+                                exclude_cols,
+                                cv_used=False,
+                                cv_folds=None,
+                                seed=st.session_state.get("global_seed"),
+                            )
 
                         st.write(f"### Detected Task: {task_type.capitalize()}")
 
                         # ---- Classification ----
                         if task_type == "classification":
+                            import pandas as pd, matplotlib.pyplot as plt
+
                             summary_data = []
                             for model, metrics in output["results"].items():
                                 if "classification_report" in metrics and isinstance(metrics["classification_report"], dict):
                                     f1_weighted = metrics["classification_report"]["weighted avg"]["f1-score"]
                                 else:
                                     f1_weighted = metrics.get("f1_score", None)
-
                                 summary_data.append({
                                     "Model": model,
                                     "Accuracy": metrics.get("accuracy", None),
@@ -289,30 +344,26 @@ if st.session_state.df is not None:
                                     "ROC AUC": metrics.get("roc_auc", None),
                                 })
 
-                            # I will save this summary_df in case I need it later
                             summary_df = pd.DataFrame(summary_data)
-
-                            # round and convert to string to force formatting
                             summary_df_table = summary_df.map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
 
                             st.write("#### Performance Summary")
                             st.table(summary_df_table.set_index("Model"))
                             df_download_buttons("test-metrics", summary_df, base=dataset_name, excel=excel_pref)
-                            
+
                             # Advanced Metrics
                             with st.expander("🔍 Advanced Metrics (per-class details)"):
                                 st.markdown("Note: `0`, `1`, etc. in **Class/Avg** are your target classes; rows like **macro avg**/**weighted avg** are aggregates.")
                                 for model, metrics in output["results"].items():
                                     st.markdown(f"**{model}**")
                                     if "classification_report" in metrics and isinstance(metrics["classification_report"], dict):
-                                        report_df = pd.DataFrame(metrics["classification_report"]).transpose()
-                                        report_df = report_df.round(3)
+                                        report_df = pd.DataFrame(metrics["classification_report"]).transpose().round(3)
                                         st.dataframe(report_df)
                                         df_download_buttons(f"{model}-classification-report", report_df, base=dataset_name, excel=excel_pref)
                                     else:
                                         st.write("No detailed report available.")
-                            
-                            # Feature Importance (Random Forest Only)
+
+                            # Feature Importances (Random Forest)
                             with st.expander("🌳 Feature Importances (Random Forest)"):
                                 for model, metrics in output["results"].items():
                                     if "feature_importances" in metrics and metrics["feature_importances"]:
@@ -322,76 +373,56 @@ if st.session_state.df is not None:
                                             st.pyplot(fig, use_container_width=False)
                                             fig_download_button(f"{model}-rf-importances", fig, base=dataset_name)
 
-                            # Model Diagnostics
+                            # Diagnostics
                             with st.expander("📊 Model Diagnostics (Visuals)"):
+                                import pandas as pd
                                 st.caption("Visual plots to help interpret classification performance.")
-
                                 for model, metrics in output["results"].items():
-                                    if "classification_report" in metrics:  
-                                        st.markdown(f"**{model}**")
+                                    preds = metrics.get("preds")
+                                    probs = metrics.get("probs")
+                                    if preds is None or y_test is None:
+                                        continue
 
-                                        preds = metrics.get("preds")
-                                        probs = metrics.get("probs")
-                                        if preds is None:
-                                            st.info("No predictions available for this model.")
-                                            continue
+                                    st.markdown(f"**{model}**")
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        st.caption("• Confusion Matrix")
+                                        cm_fig = utils.plot_confusion_matrix(y_test, preds, labels=sorted(pd.Series(y_test).unique()))
+                                        st.pyplot(cm_fig, use_container_width=False)
+                                    with col2:
+                                        st.caption("• ROC Curve")
+                                        roc_fig = None
+                                        if probs is not None and pd.Series(y_test).nunique() == 2:
+                                            roc_fig = utils.plot_roc_curve(y_test, probs)
+                                            st.pyplot(roc_fig, use_container_width=False)
+                                        else:
+                                            st.info("ROC not available (needs binary target and probability scores).")
 
-                                        # --- Confusion Matrix + ROC side-by-side (plots row)
-                                        col1, col2 = st.columns(2)
-
-                                        with col1:
-                                            st.caption("• Confusion Matrix")
-                                            cm_fig = utils.plot_confusion_matrix(y_test, preds, labels=sorted(y.unique()))
-                                            st.pyplot(cm_fig, use_container_width=False)
-
-                                        with col2:
-                                            st.caption("• ROC Curve")
-                                            roc_fig = None
-                                            if probs is not None and y.nunique() == 2:
-                                                roc_fig = utils.plot_roc_curve(y_test, probs)
-                                                st.pyplot(roc_fig, use_container_width=False)
-                                            else:
-                                                st.info("ROC not available (needs binary target and probability scores).")
-
-                                        # --- Download buttons row (always aligned)
-                                        b1, b2 = st.columns(2)
-                                        with b1:
-                                            fig_download_button(
-                                                f"{model}-confusion-matrix",
-                                                cm_fig,
-                                                base=st.session_state.get("dataset_name", "dataset")
-                                            )
-                                        with b2:
-                                            if roc_fig is not None:
-                                                fig_download_button(
-                                                    f"{model}-roc-curve",
-                                                    roc_fig,
-                                                    base=st.session_state.get("dataset_name", "dataset")
-                                                )
-
-                                        # now close the figures (after buttons use them)
-                                        import matplotlib.pyplot as plt
-                                        plt.close(cm_fig)
+                                    b1, b2 = st.columns(2)
+                                    with b1:
+                                        fig_download_button(f"{model}-confusion-matrix", cm_fig, base=st.session_state.get("dataset_name", "dataset"))
+                                    with b2:
                                         if roc_fig is not None:
-                                            plt.close(roc_fig)
+                                            fig_download_button(f"{model}-roc-curve", roc_fig, base=st.session_state.get("dataset_name", "dataset"))
 
-                                        st.markdown("---")
+                                    plt.close(cm_fig)
+                                    if roc_fig is not None:
+                                        plt.close(roc_fig)
+                                    st.markdown("---")
 
-
-                            # Metric Definitions
                             with st.expander("📖 Metric Definitions"):
                                 st.markdown("""
-                                - **Accuracy**: Proportion of correctly classified samples.
-                                - **F1 Score (weighted)**: Harmonic mean of precision and recall, weighted by class frequency.
-                                - **ROC AUC**: Measures how well the model separates classes; 0.5 = random, 1.0 = perfect.
-                                - **Precision**: Among predicted positives, proportion that were actually positive.
-                                - **Recall (Sensitivity)**: Among actual positives, proportion predicted correctly.
-                                - **Macro Avg**: Average across classes, treating each equally.
-                                - **Weighted Avg**: Average across classes, weighted by number of samples.
-                                """)
+            - **Accuracy**: Proportion of correctly classified samples.
+            - **F1 Score (weighted)**: Harmonic mean of precision and recall, weighted by class frequency.
+            - **ROC AUC**: Measures how well the model separates classes.
+            - **Precision**: Among predicted positives, proportion actually positive.
+            - **Recall**: Among actual positives, proportion predicted correctly.
+            """)
 
                         # ---- Regression ----
                         elif task_type == "regression":
+                            import pandas as pd, matplotlib.pyplot as plt
+
                             summary_data = []
                             for model, metrics in output["results"].items():
                                 summary_data.append({
@@ -400,12 +431,10 @@ if st.session_state.df is not None:
                                     "MAE": metrics.get("mae", None),
                                     "RMSE": metrics.get("rmse", None),
                                 })
-                            # I will save this summary_df in case I need it later
-                            summary_df = pd.DataFrame(summary_data)
 
-                            # round and convert to string to force formatting
+                            summary_df = pd.DataFrame(summary_data)
                             summary_df_table = summary_df.map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
-                        
+
                             st.write("#### Performance Summary")
                             st.table(summary_df_table.set_index("Model"))
                             df_download_buttons("test-metrics", summary_df, base=dataset_name, excel=excel_pref)
@@ -414,11 +443,6 @@ if st.session_state.df is not None:
                             with st.expander("🔍 Advanced Metrics"):
                                 for model, metrics in output["results"].items():
                                     st.markdown(f"**{model}**")
-
-                                    for k, v in metrics.items():
-                                        if isinstance(v, float):
-                                            st.write(f"- **{k.upper()}**: {v:.3f}")
-
                                     adv_df = pd.DataFrame({
                                         "metric": ["R²", "MAE", "RMSE", "MSE"],
                                         "value": [
@@ -431,77 +455,57 @@ if st.session_state.df is not None:
                                     st.dataframe(adv_df.style.format({"value": "{:.3f}"}), use_container_width=True)
                                     df_download_buttons(f"{model}-advanced-metrics", adv_df, base=dataset_name, excel=excel_pref)
 
-
-
-                            # Feature Importance (Random Forest Only)
+                            # Feature Importances (Random Forest)
                             with st.expander("🌳 Feature Importances (Random Forest)"):
                                 for model, metrics in output["results"].items():
-                                    if "feature_importances" in metrics and metrics["feature_importances"]:
-                                        fig = utils.plot_feature_importances(metrics["feature_importances"])
+                                    fi = metrics.get("feature_importances")
+                                    if fi:
+                                        fig = utils.plot_feature_importances(fi)
                                         if fig:
                                             st.markdown(f"**{model}**")
                                             st.pyplot(fig, use_container_width=False)
                                             fig_download_button(f"{model}-rf-importances", fig, base=dataset_name)
 
-                            
-                            # Model Diagnostics
+                            # Diagnostics
                             with st.expander("📊 Model Diagnostics (Visuals)"):
-                                    st.caption("Visual plots to help interpret model performance.")
+                                if y_test is None:
+                                    st.info("Diagnostics unavailable (no cached y_test).")
+                                else:
+                                    # take first model's preds as representative for diagnostics (matches your prior design)
+                                    first_preds = None
+                                    for m in output.get("results", {}).values():
+                                        if m.get("preds") is not None:
+                                            first_preds = m["preds"]
+                                            break
+                                    if first_preds is not None:
+                                        figs = utils.plot_regression_diagnostics(y_test, first_preds)
+                                        col1, col2 = st.columns(2)
+                                        with col1:
+                                            st.caption("• Residuals vs Fitted")
+                                            st.pyplot(figs[0], use_container_width=False)
+                                        with col2:
+                                            st.caption("• Prediction Error Plot")
+                                            st.pyplot(figs[1], use_container_width=False)
+                                        b1, b2 = st.columns(2)
+                                        with b1:
+                                            fig_download_button("residuals-vs-fitted", figs[0], base=dataset_name)
+                                        with b2:
+                                            fig_download_button("prediction-error", figs[1], base=dataset_name)
+                                        plt.close(figs[0]); plt.close(figs[1])
 
-                                    for model, metrics in output["results"].items():
-                                        if "r2_score" in metrics:  
-                                            st.markdown(f"**{model}**")
-
-                                            preds = metrics.get("preds")
-                                            if preds is None:
-                                                st.info("No predictions available for this model.")
-                                                continue
-
-                                            figs = utils.plot_regression_diagnostics(y_test, preds)
-
-                                            # --- Residuals vs Fitted + Prediction Error (plots row)
-                                            col1, col2 = st.columns(2)
-                                            with col1:
-                                                st.caption("• Residuals vs Fitted")
-                                                st.pyplot(figs[0], use_container_width=False)
-                                            with col2:
-                                                st.caption("• Prediction Error Plot")
-                                                st.pyplot(figs[1], use_container_width=False)
-
-                                            # --- Download buttons row (always aligned)
-                                            b1, b2 = st.columns(2)
-                                            with b1:
-                                                fig_download_button(
-                                                    f"{model}-residuals-vs-fitted",
-                                                    figs[0],
-                                                    base=st.session_state.get("dataset_name", "dataset")
-                                                )
-                                            with b2:
-                                                fig_download_button(
-                                                    f"{model}-prediction-error",
-                                                    figs[1],
-                                                    base=st.session_state.get("dataset_name", "dataset")
-                                                )
-
-                                            # close after buttons
-                                            import matplotlib.pyplot as plt
-                                            plt.close(figs[0]); plt.close(figs[1])
-
-                                            st.markdown("---")
-
-                            # Metric Definitions
                             with st.expander("📖 Metric Definitions"):
                                 st.markdown("""
-                                - **MSE (Mean Squared Error)**: The average of the squared differences between predicted and actual values.
-                                - **RMSE (Root Mean Squared Error)**: Square root of the mean squared differences, penalizes large errors more.
-                                - **MAE (Mean Absolute Error)**: Average absolute difference between predictions and actual values.            
-                                - **R² (Coefficient of Determination)**: Proportion of variance explained by the model (1.0 = perfect).
-                                """)
+            - **MSE**: Mean Squared Error.
+            - **RMSE**: Root Mean Squared Error.
+            - **MAE**: Mean Absolute Error.
+            - **R²**: Proportion of variance explained.
+            """)
 
                 except ValueError as e:
                     st.error(str(e))
                 except Exception as e:
                     st.error(f"Unexpected error: {e}")
+
 
            
     with tab4:
