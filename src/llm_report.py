@@ -363,14 +363,17 @@ def cached_ml_artifacts(df, dataset_name: str, target: str | None):
 def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
     """Streamlit UI for the LLM Report tab."""
     st.subheader("LLM Report Generation")
-    
-    # Dataset name (prefill from uploaded filename if available)
+
     dataset_name = st.text_input("Dataset name", value=default_name)
 
-    # Optional modeling
     include_modeling = st.checkbox("Include ML modeling in the report", value=False)
 
-    target: Optional[str] = None
+    #  Bind to ML tab target only
+    target = st.session_state.get("ml_target")
+    if target:
+        st.caption(f"Target (from ML tab): **{target}**")
+    else:
+        st.info("No target selected yet. Pick a target and click **Run models** in the **ML Insights** tab first.")
 
     # --- Provider & model: read from unified sidebar (session_state), no UI here ---
     provider = st.session_state.get("llm_provider", "Ollama")
@@ -389,28 +392,32 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
             return ChatOpenAI(model=openai_model, temperature=0.2)
         # Ollama path
         return OllamaLLM(model=ollama_model)
-   
+       
+    # ---- PRE-CHECK & CACHE LOOKUP (no target picker here) ----
+    models_table_md = ""
+    feat_imps = None
+    status, ctx = "ok", {}
+
     if include_modeling:
-        # Let user choose the target
-        target = st.selectbox("Select target column", options=list(df.columns))
-        st.caption("Tip: choose your label column for classification/regression.")
-     
-    # ---- PRE-CHECK ----
-    status, models_table_md, feat_imps, ctx = ("ok", "", None, {})
-    if include_modeling:
-        status, models_table_md, feat_imps, ctx = cached_ml_artifacts(df, dataset_name or "Dataset", target)
-        if status == "no_target":
-            st.warning("Pick a target to include modeling.")
-        elif status == "no_ml":
-            st.info("No cached ML results yet. Please run models in **ML Insights** first.")
-        elif status == "missing_table":
-            st.info("Cached metrics table is missing. Please re-run models in **ML Insights**.")
-        elif status == "mismatch":
-            st.info(f"ML cache is out of date ({ctx.get('reason','settings changed')}). Please re-run models in **ML Insights**.")
+        if not target:
+            status = "no_target"
+            st.warning("No target from ML tab. Pick a target and click **Run models** there first.")
+        else:
+            status, models_table_md, feat_imps, ctx = cached_ml_artifacts(
+                df,
+                dataset_name or "Dataset",
+                target
+            )
+            if status == "no_ml":
+                st.info("No cached ML results yet. Please run models in **ML Insights** first.")
+            elif status == "missing_table":
+                st.info("Cached metrics table is missing. Please re-run models in **ML Insights**.")
+            elif status == "mismatch":
+                st.info(f"ML cache is out of date ({ctx.get('reason','settings changed')}). Please re-run models in **ML Insights**.")
     else:
         st.caption("Tip: Leave modeling off to generate an EDA-only report.")
 
-    # ---- BUTTON (use status computed above) ----
+    # ---- BUTTON (enabled only when cache is valid) ----
     can_generate = (not include_modeling) or (status == "ok")
     clicked = st.button("Generate Report", disabled=not can_generate)
 
@@ -426,7 +433,7 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
                 llm=make_llm(provider),
             )
             st.session_state["llm_report_text"] = report_text
-
+    
     # ---- ALWAYS SHOW LAST REPORT ----
     if st.session_state.get("llm_report_text"):
         st.subheader("Generated Report")
