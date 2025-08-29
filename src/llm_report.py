@@ -280,14 +280,56 @@ def _format_model_metrics(models_output: dict | None) -> str:
 
     return "\n".join(lines)
 
+# --- Signature diff helpers (explain why cache is invalid) ---
+_SIG_FIELDS = ["dataset_name", "shape", "columns", "target", "excluded_cols", "cv_used", "cv_folds", "seed"]
+
+def _diff_signature(old_sig, new_sig):
+    """Return list of (field, old, new) for items that differ."""
+    diffs = []
+    for name, a, b in zip(_SIG_FIELDS, old_sig, new_sig):
+        if a != b:
+            diffs.append((name, a, b))
+    return diffs
+
+def _human_reason(diffs):
+    """Turn signature diffs into a short human hint."""
+    # Prioritize the most common user-facing causes
+    order = ["dataset_name", "target", "excluded_cols", "cv_used", "cv_folds", "seed", "columns", "shape"]
+    by_name = {n: (n, a, b) for (n, a, b) in diffs}
+    for key in order:
+        if key in by_name:
+            n, a, b = by_name[key]
+            if n == "dataset_name":
+                return "Dataset changed"
+            if n == "target":
+                return f"Target changed (was '{a}', now '{b}')"
+            if n == "excluded_cols":
+                a_len = len(a or [])
+                b_len = len(b or [])
+                return f"Excluded columns changed ({a_len} → {b_len})"
+            if n == "cv_used":
+                return "CV vs single-split setting changed"
+            if n == "cv_folds":
+                return f"CV folds changed ({a} → {b})"
+            if n == "seed":
+                return f"Random seed changed ({a} → {b})"
+            if n == "columns":
+                return "Dataset columns changed"
+            if n == "shape":
+                return "Dataset shape changed"
+    # Fallback if we get here
+    return "settings changed"
+
+
 # --- Cache helper: use ML tab artifacts, do not retrain here ---
 def cached_ml_artifacts(df, dataset_name: str, target: str | None):
     """
-    Returns (cache_valid, models_table_md, rf_importances).
-    Cache is valid iff ml_signature matches current settings and required fields exist.
+    Returns (status, models_table_md, rf_importances, context)
+    status ∈ {"ok","no_target","no_ml","missing_table","mismatch"}
+    context: dict with optional keys like {"reason": "..."} for display.
     """
     if not target:
-        return False, "", None
+        return "no_target", "", None, {}
 
     excluded = st.session_state.get("ml_excluded_cols", [])
     cv_used  = st.session_state.get("ml_cv_used", False)
@@ -300,18 +342,27 @@ def cached_ml_artifacts(df, dataset_name: str, target: str | None):
         excluded,
         cv_used,
         cv_folds,
+        seed=st.session_state.get("global_seed"),
     )
 
-    cache_valid = (
-        st.session_state.get("ml_signature") == current_sig
-        and st.session_state.get("ml_output") is not None
-        and st.session_state.get("ml_models_table_md") is not None
-    )
+    stored_sig = st.session_state.get("ml_signature")
+    ml_out = st.session_state.get("ml_output")
+    models_md = st.session_state.get("ml_models_table_md")
 
-    if not cache_valid:
-        return False, "", None
+    if ml_out is None or stored_sig is None:
+        return "no_ml", "", None, {}
 
-    return True, st.session_state.get("ml_models_table_md", ""), st.session_state.get("ml_rf_importances")
+    if not models_md:
+        # We have output but no table (e.g., intermediate or error); rare but helpful
+        return "missing_table", "", None, {}
+
+    if stored_sig != current_sig:
+        diffs = _diff_signature(stored_sig, current_sig)
+        reason = _human_reason(diffs)
+        return "mismatch", "", None, {"reason": reason}
+
+    # good to go
+    return "ok", models_md, st.session_state.get("ml_rf_importances"), {}
 
 def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
     """Streamlit UI for the LLM Report tab."""
@@ -360,13 +411,24 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
             feat_imps = None
 
             if include_modeling:
-                if not target:
+                status, models_table_md, feat_imps, ctx = cached_ml_artifacts(
+                    df, dataset_name or "Dataset", target
+                )
+
+                if status == "no_target":
                     st.warning("Pick a target to include modeling.")
                     st.stop()
-                valid, models_table_md, feat_imps = cached_ml_artifacts(df, dataset_name or "Dataset", target)
-                if not valid:
-                    st.info("No cached ML results for these settings. Run the models in the **ML Insights** tab first.")
+                elif status == "no_ml":
+                    st.info("No cached ML results yet. Please run models in **ML Insights** first.")
                     st.stop()
+                elif status == "missing_table":
+                    st.info("Cached metrics table is missing. Please re-run models in **ML Insights**.")
+                    st.stop()
+                elif status == "mismatch":
+                    reason = ctx.get("reason", "settings changed")
+                    st.info(f"ML cache is out of date ({reason}). Please re-run models in **ML Insights**.")
+                    st.stop()
+                # if status == "ok": continue and generate report
 
             # 2) Build LLM and generate the report
             try:

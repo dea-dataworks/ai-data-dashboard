@@ -313,7 +313,7 @@ def sidebar_llm_settings():
 
 
 # ---- Report Helpers ---
-def ml_signature(df, dataset_name, target, excluded_cols, cv_used, cv_folds):
+def ml_signature(df, dataset_name, target, excluded_cols, cv_used, cv_folds, seed=None):
     return (
         dataset_name,
         df.shape,
@@ -322,4 +322,5 @@ def ml_signature(df, dataset_name, target, excluded_cols, cv_used, cv_folds):
         tuple(sorted(excluded_cols or [])),
         bool(cv_used),
         int(cv_folds) if cv_used else None,
+        int(seed) if seed is not None else None,
     )

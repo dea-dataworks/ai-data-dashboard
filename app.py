@@ -59,6 +59,12 @@ if st.session_state.df is None:
             
             st.session_state.df = df    # Store the dataframe in session state
             st.session_state.dataset_name = Path(uploaded_file.name).stem
+            # Clear ML cache on dataset change
+            for k in ("ml_output","ml_models_table_md","ml_rf_importances",
+                    "ml_signature","ml_target","ml_excluded_cols",
+                    "ml_cv_used","ml_cv_folds"):
+                st.session_state.pop(k, None)
+
             st.success("File uploaded and processed sucessfully!")
             st.rerun()                  # Rerun to display the content immediately with the new df
         except Exception as e:
@@ -191,7 +197,8 @@ if st.session_state.df is not None:
                             target,
                             exclude_cols,
                             cv_used=True,
-                             cv_folds=cv_folds,
+                            cv_folds=cv_folds,
+                            seed=st.session_state.get("global_seed"),
                             )
                         
                         st.info("Cross-validation shows typical performance across folds. Turn off the checkbox to view the single 80/20 split and diagnostics plots.")
@@ -230,6 +237,7 @@ if st.session_state.df is not None:
                             exclude_cols,
                             cv_used=False,
                             cv_folds=None,
+                            seed=st.session_state.get("global_seed"),
                         )
                         
                         task_type = output["task_type"]
