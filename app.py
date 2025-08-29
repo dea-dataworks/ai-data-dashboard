@@ -161,8 +161,10 @@ if st.session_state.df is not None:
 
             if not target:
                 st.info("Select a target, configure exclusions/CV, then click **Run models**.")
-                            
-            if target:
+
+            elif not run_clicked:
+                st.info("Ready. Click **Run models** to train/evaluate with the current settings.")
+            else:
                 try:
                     # Preprocess (safe step: drops high-cardinality, splits X/y)
                     X, y = data_preprocess.preprocess_df(df, target, exclude=exclude_cols)
