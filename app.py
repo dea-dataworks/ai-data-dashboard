@@ -218,10 +218,6 @@ if st.session_state.df is not None:
                                             "MAE (mean±std)": f"{m['mae_mean']:.3f} ± {m['mae_std']:.3f}",
                                             "RMSE (mean±std)": f"{m['rmse_mean']:.3f} ± {m['rmse_std']:.3f}",
                                         })
-                                
-                                #REVIEW
-                                #cv_df_for_md = pd.DataFrame(rows)
-                                #st.session_state["ml_models_table_md"] = cv_df_for_md.to_markdown(index=False)
 
                                 cv_df = pd.DataFrame(rows)
                                 st.session_state["ml_models_table_md"] = (cv_df.to_markdown(index=False) if not cv_df.empty else "")
@@ -238,32 +234,6 @@ if st.session_state.df is not None:
                                 cv_folds=cv_folds,
                                 seed=st.session_state.get("global_seed"),
                             )
-
-                        # # ---- Render CV summary table (no diagnostics plots by design) ----
-                        # rows = []
-                        # for model, m in cv_out["results"].items():
-                        #     if task_type == "classification":
-                        #         rows.append({
-                        #             "Model": model,
-                        #             "Accuracy (mean±std)": f"{m['accuracy_mean']:.3f} ± {m['accuracy_std']:.3f}",
-                        #             "F1 weighted (mean±std)": f"{m['f1_mean']:.3f} ± {m['f1_std']:.3f}",
-                        #             "ROC AUC (mean±std)": ("—" if m["roc_auc_mean"] is None else f"{m['roc_auc_mean']:.3f} ± {m['roc_auc_std']:.3f}"),
-                        #         })
-                        #     else:
-                        #         rows.append({
-                        #             "Model": model,
-                        #             "R² (mean±std)": f"{m['r2_mean']:.3f} ± {m['r2_std']:.3f}",
-                        #             "MAE (mean±std)": f"{m['mae_mean']:.3f} ± {m['mae_std']:.3f}",
-                        #             "RMSE (mean±std)": f"{m['rmse_mean']:.3f} ± {m['rmse_std']:.3f}",
-                        #         })
-                        # cv_df = pd.DataFrame(rows).set_index("Model") if rows else pd.DataFrame()
-
-                        # st.write(f"### Detected Task: {task_type.capitalize()} ({cv_folds}-fold CV)")
-                        # if not cv_df.empty:
-                        #     st.table(cv_df)
-                        #     df_download_buttons("cv-metrics", cv_df, base=dataset_name, excel=excel_pref)
-                        # else:
-                        #     st.info("No CV metrics to display.")
 
                         st.write(f"### Detected Task: {task_type.capitalize()} ({cv_folds}-fold CV)")
                         if not cv_df.empty:
@@ -462,14 +432,17 @@ if st.session_state.df is not None:
                                 if y_test is None:
                                     st.info("Diagnostics unavailable (no cached y_test).")
                                 else:
-                                    # take first model's preds as representative for diagnostics (matches your prior design)
-                                    first_preds = None
-                                    for m in output.get("results", {}).values():
-                                        if m.get("preds") is not None:
-                                            first_preds = m["preds"]
-                                            break
-                                    if first_preds is not None:
-                                        figs = utils.plot_regression_diagnostics(y_test, first_preds)
+                                    any_plotted = False
+                                    for model, m in output.get("results", {}).items():
+                                        preds = m.get("preds")
+                                        if preds is None:
+                                            continue
+
+                                        any_plotted = True
+                                        st.markdown(f"**{model}**")
+
+                                        figs = utils.plot_regression_diagnostics(y_test, preds)  # [residuals_vs_fitted, prediction_error]
+
                                         col1, col2 = st.columns(2)
                                         with col1:
                                             st.caption("• Residuals vs Fitted")
@@ -477,12 +450,41 @@ if st.session_state.df is not None:
                                         with col2:
                                             st.caption("• Prediction Error Plot")
                                             st.pyplot(figs[1], use_container_width=False)
+
                                         b1, b2 = st.columns(2)
                                         with b1:
-                                            fig_download_button("residuals-vs-fitted", figs[0], base=dataset_name)
+                                            fig_download_button(f"{model}-residuals-vs-fitted", figs[0], base=dataset_name)
                                         with b2:
-                                            fig_download_button("prediction-error", figs[1], base=dataset_name)
+                                            fig_download_button(f"{model}-prediction-error", figs[1], base=dataset_name)
+
+                                        import matplotlib.pyplot as plt
                                         plt.close(figs[0]); plt.close(figs[1])
+                                        st.markdown("---")
+
+                                    if not any_plotted:
+                                        st.info("No predictions found to plot diagnostics.")
+                                # else:
+                                #     # take first model's preds as representative for diagnostics (matches your prior design)
+                                #     first_preds = None
+                                #     for m in output.get("results", {}).values():
+                                #         if m.get("preds") is not None:
+                                #             first_preds = m["preds"]
+                                #             break
+                                #     if first_preds is not None:
+                                #         figs = utils.plot_regression_diagnostics(y_test, first_preds)
+                                #         col1, col2 = st.columns(2)
+                                #         with col1:
+                                #             st.caption("• Residuals vs Fitted")
+                                #             st.pyplot(figs[0], use_container_width=False)
+                                #         with col2:
+                                #             st.caption("• Prediction Error Plot")
+                                #             st.pyplot(figs[1], use_container_width=False)
+                                #         b1, b2 = st.columns(2)
+                                #         with b1:
+                                #             fig_download_button("residuals-vs-fitted", figs[0], base=dataset_name)
+                                #         with b2:
+                                #             fig_download_button("prediction-error", figs[1], base=dataset_name)
+                                #         plt.close(figs[0]); plt.close(figs[1])
 
                             with st.expander("📖 Metric Definitions"):
                                 st.markdown("""
@@ -499,8 +501,6 @@ if st.session_state.df is not None:
             
             else:
                 st.info("Ready. Click **Run models** to train/evaluate with the current settings.")
-
-
            
     with tab4:
         llm_report.render_llm_tab(

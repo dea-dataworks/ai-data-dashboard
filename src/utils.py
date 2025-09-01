@@ -277,16 +277,16 @@ def _openai_is_available() -> bool:
 
 def sidebar_global_settings():
     st.header("⚙️ Global Settings")
-    st.session_state["compact_mode"] = st.checkbox("Compact mode (smaller plots, tighter layout)", value=False)
-    st.session_state["global_seed"] = st.number_input("Random seed", min_value=0, value=42, step=1)
-    st.session_state["cv_folds"] = st.number_input("CV folds", min_value=2, max_value=10, value=5, step=1)
+    st.session_state["compact_mode"] = st.checkbox("Compact mode", value=False, help = "Single plots are smaller, tighter layout.")
+    st.session_state["global_seed"] = st.number_input("Seed", min_value=0, value=42, step=1, help="Random state for reproducible splits and models.")
+    st.session_state["cv_folds"] = st.number_input("CV folds", min_value=2, max_value=10, value=5, step=1, help="Enable K-fold cross-validation for more stable metrics.")
     st.sidebar.checkbox("Show Excel downloads",value=st.session_state.get("dl_excel_global", False), key="dl_excel_global",
     help="When on, all tables show an Excel button alongside CSV.")
 
     
 
 def sidebar_llm_settings():
-    st.subheader("🤖 LLM Provider")
+    st.subheader("LLM Provider")
     openai_available = _openai_is_available()
     help_txt = None if openai_available else (
         "OpenAI disabled (missing package or API key). Install `langchain_openai` and set OPENAI_API_KEY."
