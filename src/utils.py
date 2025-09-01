@@ -254,7 +254,7 @@ def fig_download_button(title: str, fig, base: str = "dashboard", dpi: int = 150
     fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
     buf.seek(0)
     st.download_button(
-        f"🖼️ Download {title} (PNG)",
+        f"Download {title} (PNG)",
         data=buf,
         file_name=name,
         mime="image/png",

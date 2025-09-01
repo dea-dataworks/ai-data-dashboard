@@ -117,7 +117,6 @@ def stylize_axes(ax, title=None, xlabel=None, ylabel=None, lw=1.3, grid_axis=Non
 def show_schema_panel(df: pd.DataFrame) -> None:
     """
     Read-only snapshot of the dataset: dtype counts, memory, overall missing.
-    (top-5 high-cardinality text columns moved to Summary)
     """
     #st.subheader("Dataset Snapshot")
 
@@ -152,10 +151,8 @@ def show_schema_panel(df: pd.DataFrame) -> None:
             
 # summary
 def show_summary(df: pd.DataFrame):
-    # st.subheader("Basic Statistics")
-    st.write(
-        "Quick numerical/categorical summary below. On the right, see high-cardinality text columns; "
-        "on the left, columns with missing values."
+    st.caption(
+        "Quick numerical/categorical summary."
     )
     # Main stats table
     st.dataframe(
@@ -164,9 +161,47 @@ def show_summary(df: pd.DataFrame):
         height=320
     )
 
-    # --- Side-by-side compact tables: Missing | High-Cardinality ---
-    c1, c2 = st.columns(2)
+    # # --- Side-by-side compact tables: Missing | High-Cardinality ---
+    # c1, c2 = st.columns(2)
 
+    # # Missing table (Count + %)
+    # with c1:
+    #     st.markdown("**Missing values by column**")
+    #     missing_counts = df.isnull().sum()
+    #     missing_df = missing_counts[missing_counts > 0].sort_values(ascending=False).to_frame("Count")
+    #     if not df.empty:
+    #         total_rows = len(df)
+    #     else:
+    #         total_rows = 0
+    #     if total_rows > 0 and not missing_df.empty:
+    #         missing_df["Pct %"] = (missing_df["Count"] / total_rows * 100).round(2)
+    #         st.dataframe(missing_df, use_container_width=True, height=260)
+    #     else:
+    #         st.info("No missing values found in the dataset! 🎉")
+
+    # # High-cardinality table (Top-5 text columns)
+    # with c2:
+    #     st.markdown("**Top-5 High-Cardinality Text Columns**")
+    #     cat_cols = df.select_dtypes(include=["object", "category", "string"]).columns
+    #     if len(cat_cols) > 0:
+    #         card = (
+    #             df[cat_cols]
+    #             .nunique(dropna=True)
+    #             .sort_values(ascending=False)
+    #             .head(5)
+    #             .rename("unique_values")
+    #             .to_frame()
+    #         )
+    #         st.dataframe(card, use_container_width=True, height=260)
+    #     else:
+    #         st.info("No object/category/string columns detected.")
+
+# missing values and high cardinality
+ # --- Side-by-side compact tables: Missing | High-Cardinality ---
+    
+def show_missing_cardinality(df):
+    st.caption("Highlights variables with missing data or excessive unique values that may affect modeling.")
+    c1, c2 = st.columns(2)
     # Missing table (Count + %)
     with c1:
         st.markdown("**Missing values by column**")
@@ -199,30 +234,28 @@ def show_summary(df: pd.DataFrame):
         else:
             st.info("No object/category/string columns detected.")
 
-
 # missing value
-def show_missing(df):
-    st.subheader("Missing Values")
-    st.write("This table identifies columns with **missing data** (NaN values) and shows the **count of missing entries** for each. Columns not listed here have no missing values.")
+# def show_missing(df):
+#     st.subheader("Missing Values")
+#     st.write("This table identifies columns with **missing data** (NaN values) and shows the **count of missing entries** for each. Columns not listed here have no missing values.")
     
-    missing_counts = df.isnull().sum()
+#     missing_counts = df.isnull().sum()
 
-    # Filter for columns with missing values and convert to DataFrame
-    missing_df = missing_counts[missing_counts > 0].to_frame()
+#     # Filter for columns with missing values and convert to DataFrame
+#     missing_df = missing_counts[missing_counts > 0].to_frame()
 
-    # Rename the column from '0' to 'Missing Count'
-    missing_df.columns = ['Count']
+#     # Rename the column from '0' to 'Missing Count'
+#     missing_df.columns = ['Count']
 
-    # Display only if there are missing values
-    if not missing_df.empty:
-        st.dataframe(missing_df)
-    else:
-        st.info("No missing values found in the dataset! 🎉")
+#     # Display only if there are missing values
+#     if not missing_df.empty:
+#         st.dataframe(missing_df)
+#     else:
+#         st.info("No missing values found in the dataset! 🎉")
 
 # correlation
 def show_correlation(df):
-    # st.subheader("Correlation Heatmap")
-    st.write(
+    st.caption(
         "This heatmap visualizes the **correlation coefficients** between numerical features. "
         "Values close to **1** indicate strong positive correlation; **-1** strong negative."
     )
@@ -268,11 +301,10 @@ def plot_distributions(df):
     compact = st.session_state.get("compact_mode", False)
     params = get_style_params(compact)
 
-    st.write(
-        "This section allows you to visualize the distribution of numerical "
-        "features using **histograms** and **Kernel Density Estimates (KDE)**. "
-        "Histograms show the frequency of data points within specific bins, "
-        "while KDE provides a smooth estimate of the data's probability density."
+    st.caption(
+        "It allows you to visualize the distribution of numerical "
+        "features using **histograms**."
+        "Histograms show the frequency of data points within specific bins."
     )
 
     col = st.selectbox(
@@ -305,8 +337,7 @@ def plot_distributions(df):
 
 
 def plot_categorical(df):
-    # st.subheader("Categorical Feature Distribution")
-    st.write("Counts for categorical features with **< 20 unique values**.")
+    st.caption("Counts for categorical features with **less than 20 unique values**.")
 
     cat_cols = df.select_dtypes(include=["object", "category"]).columns
     plottable_cat_cols = [c for c in cat_cols if df[c].nunique(dropna=False) < 20]
@@ -346,6 +377,7 @@ def plot_categorical(df):
 
 # --- Boxplot for numeric columns ---
 def show_boxplot(df: pd.DataFrame) -> None:
+    st.caption("Identifies extreme values in numeric variables using boxplot visualizations.")
     # Numeric (exclude bool)
     num_cols = df.select_dtypes(include=["number"]).columns.tolist()
     num_cols = [c for c in num_cols if df[c].dtype != bool]
@@ -392,7 +424,7 @@ def show_boxplot(df: pd.DataFrame) -> None:
 
 # --- Value counts for categorical columns ---
 def show_value_counts(df: pd.DataFrame) -> None:
-    # st.subheader("Value Counts (Categorical)")
+    st.caption("Shows frequency distribution of categories for each non-numeric variable.")
     cat_cols = df.select_dtypes(include=["object", "category"]).columns
     if len(cat_cols) == 0:
         st.info("No categorical columns available for value counts.")
@@ -404,7 +436,7 @@ def show_value_counts(df: pd.DataFrame) -> None:
 
 # --- Data quality warnings: Duplicates count, leakage checks (feature == target,|corr|≥0.95 numeric) ---
 def show_data_quality_warnings(df: pd.DataFrame, target: str | None = None) -> None:
-    #st.subheader("Data Quality Warnings")
+    st.caption("Flags potential issues such as duplicates, target leakage, or highly correlated features.")
 
     issues = []
 

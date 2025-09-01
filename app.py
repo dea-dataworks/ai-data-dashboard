@@ -12,8 +12,6 @@ from src.ml_models import train_and_evaluate
 import src.llm_report as llm_report
 from src.utils import df_download_buttons, fig_download_button
 from src import utils
-
-# import matplotlib as mpl
 from matplotlib import font_manager as fm
 
 # Set page configuration
@@ -83,16 +81,16 @@ if st.session_state.df is not None:
             eda.show_data_quality_warnings(df, target=st.session_state.get("ml_target"))
 
         with st.expander("Dataset Snapshot", expanded=True):
-            eda.show_schema_panel(df)
+             eda.show_schema_panel(df)
 
-        with st.expander("Summary Statistics", expanded=True):
+        with st.expander("Summary Statistics", expanded=False):
             eda.show_summary(df)
 
-        # with st.expander("Missing Values", expanded=False):
-        #             eda.show_missing(df)
-
         # keep the rest collapsed
-        with st.expander("Value Counts (Categorical)", expanded=False):
+        with st.expander("Missing Values and Top High Cardinality Columns", expanded = False):
+            eda.show_missing_cardinality(df)
+
+        with st.expander("Value Counts", expanded=False):
             eda.show_value_counts(df)       
 
         with st.expander("Correlation Matrix", expanded=False):
@@ -104,7 +102,7 @@ if st.session_state.df is not None:
         with st.expander("Categorical Feature Distributions", expanded=False):
             eda.plot_categorical(df)
 
-        with st.expander("Outlier Detextion (Boxplot)", expanded=False):
+        with st.expander("Outlier Detection (Boxplot)", expanded=False):
             eda.show_boxplot(df)
 
     with tab3:
@@ -310,14 +308,18 @@ if st.session_state.df is not None:
 
                             summary_df = pd.DataFrame(summary_data)
                             summary_df_table = summary_df.map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
-
                             st.write("#### Performance Summary")
+                            st.caption("Compares baseline (Dummy) with Logistic Regression and Random Forest. Reports accuracy, F1-score, and ROC AUC.")
+                            # st.caption("**Accuracy**: Proportion of correctly classified samples.")
+                            # st.caption("**F1 Score (weighted)**: Harmonic mean of precision and recall, weighted by class frequency.")
+                            # st.caption("**ROC AUC**: Measures how well the model separates classes.")
                             st.table(summary_df_table.set_index("Model"))
                             df_download_buttons("test-metrics", summary_df, base=dataset_name, excel=excel_pref)
 
                             # Advanced Metrics
-                            with st.expander("🔍 Advanced Metrics (per-class details)"):
-                                st.markdown("Note: `0`, `1`, etc. in **Class/Avg** are your target classes; rows like **macro avg**/**weighted avg** are aggregates.")
+                            with st.expander("Advanced Metrics (per-class details)"):
+                                st.caption("Provides precision, recall, F1-score, and support for each class, along with macro, micro, and weighted averages to assess performance across imbalanced classes")
+                                st.caption("Note: `0`, `1`, etc. in **Class/Avg** are your target classes; rows like **macro avg**/**weighted avg** are aggregates.")
                                 for model, metrics in output["results"].items():
                                     st.markdown(f"**{model}**")
                                     if "classification_report" in metrics and isinstance(metrics["classification_report"], dict):
@@ -328,7 +330,8 @@ if st.session_state.df is not None:
                                         st.write("No detailed report available.")
 
                             # Feature Importances (Random Forest)
-                            with st.expander("🌳 Feature Importances (Random Forest)"):
+                            with st.expander("Feature Importances"):
+                                st.caption("Highlights the most influential features for classification, based on Random Forest importance scores.")
                                 for model, metrics in output["results"].items():
                                     if "feature_importances" in metrics and metrics["feature_importances"]:
                                         fig = utils.plot_feature_importances(metrics["feature_importances"])
@@ -338,8 +341,9 @@ if st.session_state.df is not None:
                                             fig_download_button(f"{model}-rf-importances", fig, base=dataset_name)
 
                             # Diagnostics
-                            with st.expander("📊 Model Diagnostics (Visuals)"):
-                                st.caption("Visual plots to help interpret classification performance.")
+                            with st.expander("Model Diagnostics (Visuals)"):
+                                st.caption("**Confusion Matrix**: Displays counts of correct and incorrect predictions by class. Correct predictions fall along the main diagonal, while off-diagonal values highlight misclassifications.")
+                                st.caption("**ROC Curve**:Plots true positive rate against false positive rate to show classification performance. A curve that bows closer to the top-left corner indicates stronger discrimination, while a diagonal line represents random guessing.")
                                 for model, metrics in output["results"].items():
                                     preds = metrics.get("preds")
                                     probs = metrics.get("probs")
@@ -373,7 +377,7 @@ if st.session_state.df is not None:
                                         plt.close(roc_fig)
                                     st.markdown("---")
 
-                            with st.expander("📖 Metric Definitions"):
+                            with st.expander("Metric Definitions"):
                                 st.markdown("""
                                 - **Accuracy**: Proportion of correctly classified samples.
                                 - **F1 Score (weighted)**: Harmonic mean of precision and recall, weighted by class frequency.
@@ -381,6 +385,20 @@ if st.session_state.df is not None:
                                 - **Precision**: Among predicted positives, proportion actually positive.
                                 - **Recall**: Among actual positives, proportion predicted correctly.
                                 """)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
                         # ---- Regression ----
                         elif task_type == "regression":
@@ -396,12 +414,15 @@ if st.session_state.df is not None:
                             summary_df = pd.DataFrame(summary_data)
                             summary_df_table = summary_df.map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
 
+                            # Performance Summary
                             st.write("#### Performance Summary")
+                            st.caption("Compares baseline (Dummy) with Linear Regression and Random Forest Regressor. Reports R², MAE, and RMSE.")
                             st.table(summary_df_table.set_index("Model"))
                             df_download_buttons("test-metrics", summary_df, base=dataset_name, excel=excel_pref)
 
                             # Advanced Metrics (extra details if available)
-                            with st.expander("🔍 Advanced Metrics"):
+                            with st.expander("Advanced Metrics"):
+                                st.caption("Reports error measures beyond R², including MAE, MSE, RMSE, and MAPE, to give a more complete view of model accuracy.")
                                 for model, metrics in output["results"].items():
                                     st.markdown(f"**{model}**")
                                     adv_df = pd.DataFrame({
@@ -416,8 +437,9 @@ if st.session_state.df is not None:
                                     st.dataframe(adv_df.style.format({"value": "{:.3f}"}), use_container_width=True)
                                     df_download_buttons(f"{model}-advanced-metrics", adv_df, base=dataset_name, excel=excel_pref)
 
-                            # Feature Importances (Random Forest)
-                            with st.expander("🌳 Feature Importances (Random Forest)"):
+                            # Feature Importances
+                            with st.expander("Feature Importances"):
+                                st.caption("Highlights the features most predictive of the target in regression, based on Random Forest importance scores.")
                                 for model, metrics in output["results"].items():
                                     fi = metrics.get("feature_importances")
                                     if fi:
@@ -427,8 +449,11 @@ if st.session_state.df is not None:
                                             st.pyplot(fig, use_container_width=False)
                                             fig_download_button(f"{model}-rf-importances", fig, base=dataset_name)
 
-                            # Diagnostics
-                            with st.expander("📊 Model Diagnostics (Visuals)"):
+                            # Model Diagnostics Visuals
+                            with st.expander("Model Diagnostics (Visuals)"):
+                                #st.caption("Residuals vs Fitted highlights potential bias and heteroscedasticity, while the Prediction Error Plot compares predicted against actual values to assess overall model fit")
+                                st.caption("**Residuals vs Fitted**: Plots residuals against predicted values to reveal bias, non-linearity, or heteroscedasticity. A random scatter around zero indicates a well-fitted model.")
+                                st.caption("**Prediction Error Plot**: Compares predicted against actual values. Points close to the diagonal line indicate accurate predictions, while large deviations signal poor fit.")
                                 if y_test is None:
                                     st.info("Diagnostics unavailable (no cached y_test).")
                                 else:
@@ -463,36 +488,13 @@ if st.session_state.df is not None:
 
                                     if not any_plotted:
                                         st.info("No predictions found to plot diagnostics.")
-                                # else:
-                                #     # take first model's preds as representative for diagnostics (matches your prior design)
-                                #     first_preds = None
-                                #     for m in output.get("results", {}).values():
-                                #         if m.get("preds") is not None:
-                                #             first_preds = m["preds"]
-                                #             break
-                                #     if first_preds is not None:
-                                #         figs = utils.plot_regression_diagnostics(y_test, first_preds)
-                                #         col1, col2 = st.columns(2)
-                                #         with col1:
-                                #             st.caption("• Residuals vs Fitted")
-                                #             st.pyplot(figs[0], use_container_width=False)
-                                #         with col2:
-                                #             st.caption("• Prediction Error Plot")
-                                #             st.pyplot(figs[1], use_container_width=False)
-                                #         b1, b2 = st.columns(2)
-                                #         with b1:
-                                #             fig_download_button("residuals-vs-fitted", figs[0], base=dataset_name)
-                                #         with b2:
-                                #             fig_download_button("prediction-error", figs[1], base=dataset_name)
-                                #         plt.close(figs[0]); plt.close(figs[1])
-
                             with st.expander("📖 Metric Definitions"):
                                 st.markdown("""
-            - **MSE**: Mean Squared Error.
-            - **RMSE**: Root Mean Squared Error.
-            - **MAE**: Mean Absolute Error.
-            - **R²**: Proportion of variance explained.
-            """)
+                                        - **MSE**: Mean Squared Error.
+                                        - **RMSE**: Root Mean Squared Error.
+                                        - **MAE**: Mean Absolute Error.
+                                        - **R²**: Proportion of variance explained.
+                                        """)
 
                 except ValueError as e:
                     st.error(str(e))
