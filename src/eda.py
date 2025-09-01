@@ -307,11 +307,23 @@ def plot_distributions(df):
         "Histograms show the frequency of data points within specific bins."
     )
 
-    col = st.selectbox(
-        "Select a numeric column",
-        df.select_dtypes(include=["int64", "float64"]).columns,
-        key="eda_plot_distributions_numeric_select",
-    )
+    # col = st.selectbox(
+    #     "Select a numeric column",
+    #     df.select_dtypes(include=["int64", "float64"]).columns,
+    #     key="eda_plot_distributions_numeric_select",
+    # )
+
+    num_candidates = df.select_dtypes(include=["int64", "float64"]).columns
+    numeric_cols = [c for c in num_candidates if df[c].nunique() > 2]
+
+    if numeric_cols:
+        col = st.selectbox(
+            "Select a numeric column",
+            numeric_cols,
+            key="eda_plot_distributions_numeric_select",
+        )
+    else: 
+        st.info("No numeric columns with >2 unique values available for histogram.")
 
     fig, ax = plt.subplots(figsize=params["figsize"], dpi=params["dpi"])
     with PlotStyle(compact):
