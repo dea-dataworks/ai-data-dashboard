@@ -285,26 +285,70 @@ def sidebar_global_settings():
 
     
 
+# def sidebar_llm_settings():
+#     st.subheader("LLM Provider")
+#     openai_available = _openai_is_available()
+
+#     help_txt = None if openai_available else (
+#         "OpenAI disabled (missing package or API key). Install `langchain_openai` and set OPENAI_API_KEY."
+#     )
+
+#     provider = st.radio("Provider", ["Ollama (local)", "OpenAI (cloud, API key required)"], index=0, help=help_txt)
+
+#     if provider == "OpenAI (cloud, API key required)" and not openai_available:
+#         st.warning("OpenAI is not configured; falling back to **Ollama**.")
+#         provider = "Ollama (local)"
+#     if provider == "Ollama (local)":
+#         ollama_model = st.selectbox("Ollama model", options=["mistral"], index=0)
+#         openai_model = "gpt-4o-mini"
+#     else:
+#         openai_model = st.selectbox("OpenAI", options=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"], index=0)
+#         ollama_model = "mistral"
+
+#     # expose globally
+#     st.session_state["llm_provider"] = provider
+#     st.session_state["ollama_model"] = ollama_model
+#     st.session_state["openai_model"] = openai_model
+#     st.session_state["openai_available"] = openai_available
+
+
 def sidebar_llm_settings():
     st.subheader("LLM Provider")
     openai_available = _openai_is_available()
+
+    OLLAMA_LABEL = "Ollama (local)"
+    OPENAI_LABEL = "OpenAI (cloud, API key required)"
+
+    # Tooltip: only show the disable note when OpenAI isn't available
     help_txt = None if openai_available else (
         "OpenAI disabled (missing package or API key). Install `langchain_openai` and set OPENAI_API_KEY."
     )
-    provider = st.radio("Provider", ["Ollama", "OpenAI"], index=0, help=help_txt)
+
+    # Only show OpenAI in options if available
+    options = [OLLAMA_LABEL] + ([OPENAI_LABEL] if openai_available else [])
+    choice = st.radio("Provider", options, index=0, help=help_txt)
+
+    # Map label -> canonical value for stable comparisons downstream
+    provider = "Ollama" if choice == OLLAMA_LABEL else "OpenAI"
+
+    # Safety: if user had OpenAI selected but it's not available
     if provider == "OpenAI" and not openai_available:
         st.warning("OpenAI is not configured; falling back to **Ollama**.")
         provider = "Ollama"
 
     if provider == "Ollama":
         ollama_model = st.selectbox("Ollama model", options=["mistral"], index=0)
-        openai_model = "gpt-4o-mini"
+        openai_model = "gpt-4o-mini"  # placeholder so session state is consistent
     else:
-        openai_model = st.selectbox("OpenAI model", options=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"], index=0)
-        ollama_model = "mistral"
+        openai_model = st.selectbox(
+            "OpenAI model",
+            options=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"],
+            index=0,
+        )
+        ollama_model = "mistral"  # placeholder
 
-    # expose globally
-    st.session_state["llm_provider"] = provider
+    # expose globally (canonical values)
+    st.session_state["llm_provider"] = provider          # "Ollama" or "OpenAI"
     st.session_state["ollama_model"] = ollama_model
     st.session_state["openai_model"] = openai_model
     st.session_state["openai_available"] = openai_available
