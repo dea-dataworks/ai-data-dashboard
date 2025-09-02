@@ -247,7 +247,6 @@ def llm_report_tab(
         - **Shape:** {shape}
         - **Target:** {target}
         - **Key variables:** {sample_columns}
-        - **Excluded columns:** {excluded_note}
         - In one sentence, characterize the dataset at a high level (no long lists).
          If any remaining columns look like IDs or ticket codes, briefly flag them as 
          potentially high-cardinality features of limited predictive value.
@@ -292,11 +291,16 @@ def llm_report_tab(
 
 
         ## 5) Practical Takeaways
-        Provide **4–6** specific, actionable recommendations tied to the issues and signals above.
-        Be concrete (what to impute/drop/engineer, how to validate). If little is available, keep this brief.
+        Provide 3–6 concise, **actionable bullet points**. 
+        Use the following style guidelines:
+        - Drop features only if clearly unusable (e.g., >70% missing).
+        - Recommend specific imputation strategies (e.g., median, group-based).
+        - Suggest simple, interpretable feature engineering (e.g., FamilySize = SibSp + Parch).
+        - Flag overfitting risks if n < 200 or many features vs. rows.
+        - Always mention validating models with k-fold cross-validation (esp. RF/LogReg).
         {recommendations}
 
-        ## 6) Notes
+        ## Notes
         - **Excluded columns:** {excluded_note}
         - If any section lacked inputs, note it as **N/A** and proceed without guessing.
         """
@@ -520,6 +524,10 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
                 st.caption("Using results from **ML Insights** (last run).")
     else:
         st.caption("Tip: Leave modeling off to generate an EDA-only report.")
+
+    # excluded_cols = st.session_state.get("ml_excluded_cols", [])     
+    # if excluded_cols:
+    #     st.caption(f"⚠️ The following columns were excluded from modeling: {', '.join(excluded_cols)}")
 
     # ---- BUTTON (enabled only when cache is valid) ----
     can_generate = (not include_modeling) or (status == "ok")
