@@ -96,6 +96,75 @@ def _corr_to_sentences(corr_dict: Dict[str, float], target: Optional[str]) -> st
         lines.append(f"- {feat} is {direction} associated with {tgt} (r = {r:+.3f}).")
     return "\n".join(lines)
 
+# ---------- Feature-driver helpers (collapse one-hot, rank, interpret) ----------
+def _strip_pipeline_prefix(name: str) -> str:
+    for pre in ("num__", "cat__", "text__", "bin__"):
+        if name.startswith(pre):
+            return name[len(pre):]
+    return name
+
+def _collapse_one_hot_importances(fi: Optional[Dict[str, float]]) -> list[tuple[str, float]]:
+    """
+    Collapse groups like Sex_male/Sex_female -> "Sex (male)" with the group's top suffix by importance.
+    Keeps single columns as-is. Returns list of (pretty_name, score) sorted desc by score.
+    """
+    if not fi:
+        return []
+    cleaned: Dict[str, float] = {_strip_pipeline_prefix(k): float(v) for k, v in fi.items()}
+
+    # Group by base (text before first underscore). If we see >=2 suffix variants, treat as one-hot group.
+    by_base: Dict[str, list[tuple[str, float]]] = {}
+    for name, score in cleaned.items():
+        base, sep, suffix = name.partition("_")
+        if sep:  # looks like one-hot
+            by_base.setdefault(base, []).append((suffix, score))
+        else:
+            by_base.setdefault(base, []).append(("", score))
+
+    aggregated: list[tuple[str, float]] = []
+    for base, parts in by_base.items():
+        # one-hot if we have at least two suffixed variants
+        has_ohe = sum(1 for s, _ in parts if s) >= 2
+        if has_ohe:
+            best_suffix, best_score = max(parts, key=lambda t: t[1])
+            pretty = f"{base} ({best_suffix})"
+            aggregated.append((pretty, best_score))
+        else:
+            # either a single plain column or only one suffixed variant
+            sfx, score = parts[0]
+            pretty = base if sfx == "" else f"{base} ({sfx})"
+            aggregated.append((pretty, score))
+
+    aggregated.sort(key=lambda t: t[1], reverse=True)
+    return aggregated
+
+def _interpret_driver(name: str, dataset_name: str) -> str:
+    """Tiny interpretation layer; Titanic-aware, generic otherwise."""
+    ds = (dataset_name or "").lower()
+    base = name.split(" (")[0]
+    if "titanic" in ds:
+        if name.startswith("Sex"):
+            return "males had much lower survival."
+        if base == "Pclass":
+            return "higher class increased survival likelihood."
+        if base == "Age":
+            return "younger passengers showed better outcomes."
+        if base == "SibSp":
+            return "more siblings/spouses generally reduced survival odds."
+        if base == "Fare":
+            return "higher fares correlated with better survival."
+    return "important for predicting the target in this dataset."
+
+def _feature_drivers_markdown(fi: Optional[Dict[str, float]], dataset_name: str, top_k: int = 3) -> str:
+    """Build final markdown list (ranked 1..k) ready to print in the report."""
+    agg = _collapse_one_hot_importances(fi)
+    if not agg:
+        return "N/A"
+    lines = []
+    for i, (pretty, _score) in enumerate(agg[:top_k], start=1):
+        lines.append(f"{i}. **{pretty}:** {_interpret_driver(pretty, dataset_name)}")
+    return "\n".join(lines) if lines else "N/A"
+
 # ---------- Main function: compute stats, call LLM ----------
 
 def llm_report_tab(
@@ -152,16 +221,20 @@ def llm_report_tab(
     # feature_importances = _top_items(feature_importances or {}, k=15)
     # feature_importances_str = _fmt_dict(feature_importances, max_items=15)
 
-    # Feature importances: pass only the top-5 names (no numbers) to encourage interpretation
-    fi_dict = _top_items(feature_importances or {}, k=5)
-    def _clean_feat_name(name: str) -> str:
-        # strip common pipeline prefixes to make names nicer in prose
-        for pre in ("num__", "cat__", "text__", "bin__"):
-            if name.startswith(pre):
-                return name[len(pre):]
-        return name
-    fi_names = [ _clean_feat_name(n) for n, _ in sorted(fi_dict.items(), key=lambda x: float(x[1]), reverse=True) ]
-    fi_names_str = ", ".join(fi_names)
+    # # Feature importances: pass only the top-5 names (no numbers) to encourage interpretation
+    # fi_dict = _top_items(feature_importances or {}, k=5)
+    # def _clean_feat_name(name: str) -> str:
+    #     # strip common pipeline prefixes to make names nicer in prose
+    #     for pre in ("num__", "cat__", "text__", "bin__"):
+    #         if name.startswith(pre):
+    #             return name[len(pre):]
+    #     return name
+    # fi_names = [ _clean_feat_name(n) for n, _ in sorted(fi_dict.items(), key=lambda x: float(x[1]), reverse=True) ]
+    # fi_names_str = ", ".join(fi_names)
+
+    # Build finalized, human-friendly Feature Drivers (ranked, top-3, one-hot collapsed)
+    feature_drivers_md = _feature_drivers_markdown(feature_importances, dataset_name, top_k=3)
+ 
 
     template = """
         You are a precise data analyst. Write a concise, client-ready **Markdown** report.
@@ -200,17 +273,23 @@ def llm_report_tab(
         {missing_values}
 
         ## 3) Modeling Summary
-        Write one sentence comparing model performance **based on the metrics table below**.
-        - State which model appears best overall and whether the improvement is small, moderate, or large.
-        - Do not calculate or invent exact percentages.
-        Then present the provided table verbatim (do not restate each row in prose).
-
+        Write one or two sentences comparing model performance **based on the metrics table below**.  
+        - Identify which models perform clearly better than the baseline (Dummy Classifier).  
+        - If two or more models are competitive, describe the trade-offs (e.g., one stronger on Accuracy/F1, another on ROC AUC).  
+        - Use only qualitative terms such as “slightly better,” “comparable,” or “clearly stronger.”  
+        - Do not calculate or invent exact percentages or restate each row in prose.  
+        Then present the provided table verbatim.
         {models_table_md}
 
-        ## 4) Feature Drivers (if available)
-        From the list below, highlight the **top 3–5** most important features in ranked order with a one-line interpretation each.
-        Do not print the entire list; avoid raw numbers when not needed.
-        {feature_importances}
+        ## 4) Feature Drivers (ranked by RF importance)
+        Rewrite the input below as a **Markdown numbered list (1., 2., 3.)**.  
+        Each item must:
+        - Bold the feature name,  
+        - Keep the short interpretation,  
+        - Follow the ranked order exactly.  
+        If input says N/A, write N/A.
+        {feature_drivers_md}
+
 
         ## 5) Practical Takeaways
         Provide **4–6** specific, actionable recommendations tied to the issues and signals above.
@@ -226,9 +305,10 @@ def llm_report_tab(
     prompt = PromptTemplate(
         template=template.strip(),
         input_variables=[
-            "dataset_name", "shape", "column_types", "sample_columns", "target", 
-            "class_balance", "missing_values", "correlations", "feature_importances",
-            "model_list", "model_metrics", "recommendations", "models_table_md", "excluded_note"
+            "dataset_name", "shape", "column_types", "sample_columns", "target",
+            "class_balance", "missing_values", "correlations",
+            "model_list", "model_metrics", "recommendations", "models_table_md",
+            "excluded_note", "feature_drivers_md"
         ],
     )
 
@@ -244,7 +324,8 @@ def llm_report_tab(
         "class_balance": _fmt_dict(class_balance, max_items=20) if class_balance else "not available",
         "missing_values": _fmt_dict(missing_vals, max_items=50) if missing_vals else "no missing values",
         "correlations": correlations_sent,
-        "feature_importances": (fi_names_str if fi_names else "not available"),
+        #"feature_importances": (fi_names_str if fi_names else "not available"),
+        "feature_drivers_md": feature_drivers_md,
         "model_list": ", ".join(model_list) if model_list else "not available",
         "model_metrics": model_metrics_str if model_metrics else "not available",
         "recommendations": recommendations,
