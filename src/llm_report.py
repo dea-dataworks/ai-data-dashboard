@@ -126,7 +126,6 @@ def llm_report_tab(
     missing_vals = _missing_values(df)
     use_df = df.drop(columns=excluded_columns or [], errors="ignore")
     correlations = _safe_corr_with_target(use_df, target, top_k=top_k_corr) if target else {}
-    #correlations = _safe_corr_with_target(df, target, top_k=top_k_corr) if target else {}
     correlations_text = _trim_corr_text(correlations, min_abs=0.10, max_items=8)
     correlations_sent = _corr_to_sentences(correlations, target)
 
@@ -143,21 +142,7 @@ def llm_report_tab(
             else:
                 sentences.append(f"- {feat} shows a {strength}{direction} association with {tgt}.")
     correlations_sent = "\n".join(sentences[:3]) if sentences else "No strong correlations (|r| ≥ 0.10)."
-
-    # Default recs if none provided
-    # if not recommendations:
-    #     recs = []
-    #     if missing_vals:
-    #         worst = list(missing_vals.items())[0]
-    #         recs.append(f"Handle missing values (e.g., impute or drop). Highest missing: {worst[0]}={worst[1]}.")
-    #     if target:
-    #         recs.append(f"Check class balance for '{target}' and consider stratified splits/metrics beyond accuracy.")
-    #     if correlations:
-    #         top_feat, top_val = next(iter(correlations.items()))
-    #         recs.append(f"Leverage strongly correlated features (e.g., {top_feat} with corr {top_val:+.3f}).")
-    #     recs.append("Consider feature engineering and model calibration; validate with cross-validation.")
-    #     recommendations = "- " + "\n- ".join(recs)
-        
+       
     if recommendations is None:
         recommendations = ""
 
@@ -214,14 +199,7 @@ def llm_report_tab(
         **Missing values (top) input:**  
         {missing_values}
 
-
-
-        ## 3) Key Patterns & Signals
-        Turn correlations into 2–4 human sentences or bullets. Use plain English;
-        include r in parentheses only when helpful. Do not invent new statistics.
-        {correlations}
-
-        ## 4) Modeling Summary
+        ## 3) Modeling Summary
         Write one sentence comparing model performance **based on the metrics table below**.
         - State which model appears best overall and whether the improvement is small, moderate, or large.
         - Do not calculate or invent exact percentages.
@@ -229,17 +207,17 @@ def llm_report_tab(
 
         {models_table_md}
 
-        ## 5) Feature Drivers (if available)
+        ## 4) Feature Drivers (if available)
         From the list below, highlight the **top 3–5** most important features in ranked order with a one-line interpretation each.
         Do not print the entire list; avoid raw numbers when not needed.
         {feature_importances}
 
-        ## 6) Practical Takeaways
+        ## 5) Practical Takeaways
         Provide **4–6** specific, actionable recommendations tied to the issues and signals above.
         Be concrete (what to impute/drop/engineer, how to validate). If little is available, keep this brief.
         {recommendations}
 
-        ## 7) Notes
+        ## 6) Notes
         - **Excluded columns:** {excluded_note}
         - If any section lacked inputs, note it as **N/A** and proceed without guessing.
         """
