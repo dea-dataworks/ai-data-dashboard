@@ -1,18 +1,16 @@
-import os
+#import os
 from pathlib import Path
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+#from matplotlib import font_manager as fm
 import src.utils as utils
 import src.eda as eda
 import src.ml_models as ml
-from src import data_preprocess
-#from src.data_preprocess import preprocess_df
 from src.ml_models import train_and_evaluate
 import src.llm_report as llm_report
 from src.utils import df_download_buttons, fig_download_button
-from src import utils
-from matplotlib import font_manager as fm
+
 
 # Set page configuration
 st.set_page_config(page_title="AI Data Insight Dashboard", layout="wide")
@@ -52,7 +50,7 @@ if st.session_state.df is None:
                     "ml_cv_used","ml_cv_folds"):
                 st.session_state.pop(k, None)
 
-            st.success("File uploaded and processed sucessfully!")
+            st.success("File uploaded and processed successfully!")
             st.rerun()                  # Rerun to display the content immediately with the new df
         except Exception as e:
             st.error(f"Error reading file: {e}. Please ensure it's a valid CSV or Excel file.")
