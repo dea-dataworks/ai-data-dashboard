@@ -7,7 +7,7 @@ import src.utils as utils
 import src.eda as eda
 import src.ml_models as ml
 from src import data_preprocess
-from src.data_preprocess import preprocess_df
+#from src.data_preprocess import preprocess_df
 from src.ml_models import train_and_evaluate
 import src.llm_report as llm_report
 from src.utils import df_download_buttons, fig_download_button
@@ -177,7 +177,7 @@ if st.session_state.df is not None:
                 try:
                     # --- Prepare data only if we will train now (no need when using cache) ---
                     if not use_cache:
-                        X, y = data_preprocess.preprocess_df(df, target, exclude=exclude_cols)
+                        X, y = utils.preprocess_df(df, target, exclude=exclude_cols)
                         st.session_state["ml_excluded_cols"] = exclude_cols  # keep as before
 
                     # =========================

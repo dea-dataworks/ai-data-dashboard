@@ -124,7 +124,9 @@ def llm_report_tab(
 
     class_balance = _class_balance(df, target) if target else {}
     missing_vals = _missing_values(df)
-    correlations = _safe_corr_with_target(df, target, top_k=top_k_corr) if target else {}
+    use_df = df.drop(columns=excluded_columns or [], errors="ignore")
+    correlations = _safe_corr_with_target(use_df, target, top_k=top_k_corr) if target else {}
+    #correlations = _safe_corr_with_target(df, target, top_k=top_k_corr) if target else {}
     correlations_text = _trim_corr_text(correlations, min_abs=0.10, max_items=8)
     correlations_sent = _corr_to_sentences(correlations, target)
 
@@ -143,65 +145,105 @@ def llm_report_tab(
     correlations_sent = "\n".join(sentences[:3]) if sentences else "No strong correlations (|r| ≥ 0.10)."
 
     # Default recs if none provided
-    if not recommendations:
-        recs = []
-        if missing_vals:
-            worst = list(missing_vals.items())[0]
-            recs.append(f"Handle missing values (e.g., impute or drop). Highest missing: {worst[0]}={worst[1]}.")
-        if target:
-            recs.append(f"Check class balance for '{target}' and consider stratified splits/metrics beyond accuracy.")
-        if correlations:
-            top_feat, top_val = next(iter(correlations.items()))
-            recs.append(f"Leverage strongly correlated features (e.g., {top_feat} with corr {top_val:+.3f}).")
-        recs.append("Consider feature engineering and model calibration; validate with cross-validation.")
-        recommendations = "- " + "\n- ".join(recs)
+    # if not recommendations:
+    #     recs = []
+    #     if missing_vals:
+    #         worst = list(missing_vals.items())[0]
+    #         recs.append(f"Handle missing values (e.g., impute or drop). Highest missing: {worst[0]}={worst[1]}.")
+    #     if target:
+    #         recs.append(f"Check class balance for '{target}' and consider stratified splits/metrics beyond accuracy.")
+    #     if correlations:
+    #         top_feat, top_val = next(iter(correlations.items()))
+    #         recs.append(f"Leverage strongly correlated features (e.g., {top_feat} with corr {top_val:+.3f}).")
+    #     recs.append("Consider feature engineering and model calibration; validate with cross-validation.")
+    #     recommendations = "- " + "\n- ".join(recs)
+        
+    if recommendations is None:
+        recommendations = ""
 
     # Model lists / metrics formatting
     model_list: List[str] = list(model_metrics.keys()) if model_metrics else []
     model_metrics_str = _fmt_dict(model_metrics or {}, max_items=20)
-    feature_importances = _top_items(feature_importances or {}, k=15)
-    feature_importances_str = _fmt_dict(feature_importances, max_items=15)
+    # feature_importances = _top_items(feature_importances or {}, k=15)
+    # feature_importances_str = _fmt_dict(feature_importances, max_items=15)
 
-    # ---- Prompt template (tight, structured, no guessing) ----
+    # Feature importances: pass only the top-5 names (no numbers) to encourage interpretation
+    fi_dict = _top_items(feature_importances or {}, k=5)
+    def _clean_feat_name(name: str) -> str:
+        # strip common pipeline prefixes to make names nicer in prose
+        for pre in ("num__", "cat__", "text__", "bin__"):
+            if name.startswith(pre):
+                return name[len(pre):]
+        return name
+    fi_names = [ _clean_feat_name(n) for n, _ in sorted(fi_dict.items(), key=lambda x: float(x[1]), reverse=True) ]
+    fi_names_str = ", ".join(fi_names)
+
     template = """
-            You are a precise data analyst. Produce a concise, client-ready Markdown report.
-            Follow these rules strictly:
-            - Express shape as "rows × columns" (not a Python tuple).
-            - Group variables by meaning when possible; do not dump long lists.
-            - Write correlations in plain English; include r only in parentheses.
-            - Avoid hedging like "if significant"; be direct and actionable.
-            - Fix typos. Use short sentences and bullets.
+        You are a precise data analyst. Write a concise, client-ready **Markdown** report.
+        **Use only** the values provided in the inputs below; if something is missing, write **N/A**.
+        Prefer short paragraphs and tight bullet points over raw dumps. Avoid hedging.
 
-            # Data Analysis Report for {dataset_name}
+        # Data Analysis Report — {dataset_name}
 
-            ## Dataset Overview
-            - Shape: {shape}
-            - Key variables (brief): {sample_columns}
-            - Class balance for target "{target}":
-            {class_balance}
+        ## 1) Dataset Snapshot
+        - **Shape:** {shape}
+        - **Target:** {target}
+        - **Key variables:** {sample_columns}
+        - **Excluded columns:** {excluded_note}
+        - In one sentence, characterize the dataset at a high level (no long lists).
+         If any remaining columns look like IDs or ticket codes, briefly flag them as 
+         potentially high-cardinality features of limited predictive value.
 
-            ## Data Quality
-            - Missing values (top offenders):
-            {missing_values}
+       ## 2) Data Quality Notes
+        Produce a **single table** followed by at most **2 bullets**. Do **not** use generic language.
 
-            ## Correlations & Feature Insights
-            {correlations}
-            - Feature importances (if available):
-            {feature_importances}
+        **Table (required):** For each entry in **Missing values (top)** below, create a row with:
+        `Column | Missing (n/N, ~%) | Severity | Recommended action`
 
-            ## Model Performance
-            - One-sentence comparison: which model is best and by roughly how much (accuracy/F1/AUC).
-            - Metrics (per model):
+        Rules (mandatory):
+        - Let **N** be the number of rows from **Shape** (e.g., “50 rows × …” → N=50).
+        - If n/N ≥ 0.70 → **Severity = Very high** and **Recommended action = Drop (likely unusable)**.
+        - If 0.10 ≤ n/N < 0.70 → **Severity = Moderate** and **Recommended action = Impute** (numeric: median or group-based; categorical: mode or group-based).
+        - If n/N < 0.10 → **Severity = Low** and **Recommended action = Minor/ignore or simple impute**.
+        - Use the exact phrases above for **Severity** and **Recommended action**. Do **not** call >70% “moderate.”
 
-            {models_table_md}
+        **Bullets (optional, ≤2):**
+        - If any columns *appear* identifier-like or **high-cardinality** (e.g., “Ticket”), add one bullet: “`<col>` appears high-cardinality; limited predictive value unless engineered.”
+        - If duplicates or class imbalance are indicated elsewhere, add one bullet with a specific action (deduplicate; use stratified split/metrics beyond accuracy).
 
-            ## Data Notes
-            - Excluded columns (user selection): 
-            {excluded_note}
+        **Missing values (top) input:**  
+        {missing_values}
 
-            ## Recommendations
-            Provide 4–6 concrete steps tailored to this dataset. Be specific (what to impute, what to drop, what to engineer, how to validate).
-            """
+
+
+        ## 3) Key Patterns & Signals
+        Turn correlations into 2–4 human sentences or bullets. Use plain English;
+        include r in parentheses only when helpful. Do not invent new statistics.
+        {correlations}
+
+        ## 4) Modeling Summary
+        Write one sentence comparing model performance **based on the metrics table below**.
+        - State which model appears best overall and whether the improvement is small, moderate, or large.
+        - Do not calculate or invent exact percentages.
+        Then present the provided table verbatim (do not restate each row in prose).
+
+        {models_table_md}
+
+        ## 5) Feature Drivers (if available)
+        From the list below, highlight the **top 3–5** most important features in ranked order with a one-line interpretation each.
+        Do not print the entire list; avoid raw numbers when not needed.
+        {feature_importances}
+
+        ## 6) Practical Takeaways
+        Provide **4–6** specific, actionable recommendations tied to the issues and signals above.
+        Be concrete (what to impute/drop/engineer, how to validate). If little is available, keep this brief.
+        {recommendations}
+
+        ## 7) Notes
+        - **Excluded columns:** {excluded_note}
+        - If any section lacked inputs, note it as **N/A** and proceed without guessing.
+        """
+
 
     prompt = PromptTemplate(
         template=template.strip(),
@@ -218,12 +260,13 @@ def llm_report_tab(
         "models_table_md": models_table_md or "Not run.",
         "shape": _shape_pretty(df),
         "column_types": _fmt_dict(col_types, max_items=50),
-        "sample_columns": _key_vars_human(df),
+        #"sample_columns": _key_vars_human(df),
+        "sample_columns": _key_vars_human(df.drop(columns=excluded_columns or [], errors="ignore")),
         "target": target or "not specified",
         "class_balance": _fmt_dict(class_balance, max_items=20) if class_balance else "not available",
         "missing_values": _fmt_dict(missing_vals, max_items=50) if missing_vals else "no missing values",
         "correlations": correlations_sent,
-        "feature_importances": feature_importances_str if feature_importances else "not available",
+        "feature_importances": (fi_names_str if fi_names else "not available"),
         "model_list": ", ".join(model_list) if model_list else "not available",
         "model_metrics": model_metrics_str if model_metrics else "not available",
         "recommendations": recommendations,
