@@ -318,7 +318,7 @@ if st.session_state.df is not None:
 
                             # Advanced Metrics
                             with st.expander("Advanced Metrics (per-class details)"):
-                                st.caption("Provides precision, recall, F1-score, and support for each class, along with macro, micro, and weighted averages to assess performance across imbalanced classes")
+                                st.caption("Provides precision, recall, F1-score, and support for each class, plus macro and weighted averages to assess performance across imbalanced classes.")
                                 st.caption("Note: `0`, `1`, etc. in **Class/Avg** are your target classes; rows like **macro avg**/**weighted avg** are aggregates.")
                                 for model, metrics in output["results"].items():
                                     st.markdown(f"**{model}**")
