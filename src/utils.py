@@ -129,6 +129,24 @@ def run_models(df: pd.DataFrame, target: str) -> dict:
         "text_summary": "\n".join(lines)
     }
 
+def format_metrics_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Format regression metrics: 
+    - MAPE as % (1 decimal)
+    - Others as 3 decimals
+    - NaNs as '—'
+    """
+    def _fmt(row):
+        val = row["value"]
+        if pd.isna(val):
+            return "—"
+        if row["metric"].lower().startswith("mape"):
+            return f"{val:.1f}%"
+        return f"{val:.3f}"
+
+    df = df.copy()
+    df["value"] = df.apply(_fmt, axis=1)
+    return df
+
 def plot_confusion_matrix(y_true, y_pred, labels):
     compact = st.session_state.get("compact_mode", False)
     params = get_style_params(compact)

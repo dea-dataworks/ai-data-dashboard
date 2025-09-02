@@ -422,16 +422,17 @@ if st.session_state.df is not None:
 
                             # Advanced Metrics (extra details if available)
                             with st.expander("Advanced Metrics"):
-                                st.caption("Reports error measures beyond R², including MAE, MSE, RMSE, and MAPE, to give a more complete view of model accuracy.")
+                                st.caption("Additional diagnostics beyond the summary: MSE, MAPE (%), Median AE, Max Error, and RMSLE (when valid), to give a more complete view of model accuracy.")
                                 for model, metrics in output["results"].items():
                                     st.markdown(f"**{model}**")
                                     adv_df = pd.DataFrame({
-                                        "metric": ["R²", "MAE", "RMSE", "MSE"],
+                                        "metric": ["MSE", "MAPE (%)", "Median AE", "Max Error", "RMSLE"],
                                         "value": [
-                                            metrics.get("r2_score", float("nan")),
-                                            metrics.get("mae", float("nan")),
-                                            metrics.get("rmse", float("nan")),
                                             metrics.get("mse", float("nan")),
+                                            metrics.get("mape", float("nan")),
+                                            metrics.get("median_ae", float("nan")),
+                                            metrics.get("max_error", float("nan")),
+                                            metrics.get("rmsle", float("nan")),
                                         ],
                                     })
                                     st.dataframe(adv_df.style.format({"value": "{:.3f}"}), use_container_width=True)

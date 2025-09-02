@@ -14,6 +14,8 @@ from sklearn.metrics import (
 from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.model_selection import cross_val_score, StratifiedKFold, KFold
 from sklearn.metrics import make_scorer, f1_score
+from sklearn.metrics import mean_absolute_percentage_error, median_absolute_error, max_error, mean_squared_log_error
+import numpy as np
 
 
 def detect_task_type(y: pd.Series) -> str:
@@ -116,7 +118,18 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
                 "rmse": mse**0.5,
                 "mae": mean_absolute_error(y_test, preds),
                 "r2_score": r2_score(y_test, preds),
-                "preds": preds
+                #new advanced metrics
+                "mape": (
+                    float("nan") if np.any(y_test == 0)
+                    else mean_absolute_percentage_error(y_test, preds) * 100.0
+                ),  # in %
+                "median_ae": median_absolute_error(y_test, preds),
+                "max_error": max_error(y_test, preds),
+                "rmsle": (
+                    float("nan") if np.any(y_test < 0) or np.any(preds < 0)
+                    else mean_squared_log_error(y_test, np.maximum(preds, 0)) ** 0.5
+                ),
+                "preds": preds,
             }
 
             if isinstance(model, RandomForestRegressor):
