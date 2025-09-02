@@ -59,10 +59,28 @@ streamlit run app.py
 ```
 Then open the local URL that Streamlit prints (usually http://localhost:8501).
 
-### LLM Provider (optional)
-- **Default:** Ollama (local) using **Mistral**.
-- **OpenAI (cloud):** If available, enable provider toggle in the sidebar (requires `langchain_openai` + `OPENAI_API_KEY`).
-- The app safely falls back to Ollama if OpenAI isn’t configured.
+### 🔮 LLM Providers
+
+By default, the dashboard uses **Ollama (local Mistral)**. You can also enable **OpenAI (cloud)** if you have an API key.  
+
+#### Option 1 — Ollama (default, local)  
+1. [Install Ollama](https://ollama.ai/download) for your OS.  
+2. Pull the Mistral model (once):  
+   ```bash
+   ollama run mistral
+   ```  
+   This downloads the model (~4 GB) and verifies it runs locally.  
+3. Run the dashboard as normal (`streamlit run app.py`). Ollama will be used automatically.  
+
+#### Option 2 — OpenAI (optional, cloud)  
+1. Requirements already include OpenAI support (`langchain-openai`, `openai`).  
+2. Set your API key in your environment:  
+   ```bash
+   export OPENAI_API_KEY=your_key_here   # macOS/Linux
+   setx OPENAI_API_KEY "your_key_here"   # Windows (PowerShell)
+   ```  
+3. Launch the dashboard, open the sidebar, and select **OpenAI** under *LLM Provider*.  
+4. If OpenAI isn’t configured, the app safely falls back to Ollama.  
 
 ---
 
