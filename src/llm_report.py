@@ -248,8 +248,9 @@ def llm_report_tab(
         - **Target:** {target}
         - **Key variables:** {sample_columns}
         - In one sentence, characterize the dataset at a high level (no long lists).
-         If any remaining columns look like IDs or ticket codes, briefly flag them as 
-         potentially high-cardinality features of limited predictive value.
+        - If any remaining columns look like IDs or ticket codes, briefly flag them as 
+          potentially high-cardinality features of limited predictive value.
+        - Do **not** mention excluded columns here; those appear only in **Notes**.
 
        ## 2) Data Quality Notes
         Produce a **single table** followed by at most **2 bullets**. Do **not** use generic language.
@@ -272,18 +273,21 @@ def llm_report_tab(
         {missing_values}
 
         ## 3) Modeling Summary
-        Write one or two sentences comparing model performance **based on the metrics table below**.  
-        - Identify which models perform clearly better than the baseline (Dummy Classifier).  
-        - If two or more models are competitive, describe the trade-offs (e.g., one stronger on Accuracy/F1, another on ROC AUC).  
-        - Use only qualitative terms such as “slightly better,” “comparable,” or “clearly stronger.”  
-        - Do not calculate or invent exact percentages or restate each row in prose.  
-        Then present the provided table verbatim.
+        Write 1–2 sentences comparing model performance **strictly using the metrics table below**.  
+        Rules (mandatory):  
+        - Always state that the Dummy Classifier is the weakest baseline.  
+        - If two or more models outperform Dummy, describe trade-offs (e.g., “RF higher Accuracy/F1, LR slightly stronger ROC AUC”).  
+        - Use only qualitative terms: “slightly higher,” “comparable,” “clearly stronger.”  
+        - Do **not** claim one model is better on all metrics unless the table supports it.  
+        - Never invent or restate exact numbers; the table speaks for itself.  
+        Then present the table verbatim.  
         {models_table_md}
 
         ## 4) Feature Drivers (ranked by RF importance)
         Rewrite the input below as a **Markdown numbered list (1., 2., 3.)**.  
         Each item must:
         - Bold the feature name,  
+        - Phrase associations in plain language (e.g., “X: higher values were associated with Y”),  
         - Keep the short interpretation,  
         - Follow the ranked order exactly.  
         If input says N/A, write N/A.
@@ -292,19 +296,19 @@ def llm_report_tab(
 
         ## 5) Practical Takeaways
         Provide 3–6 concise, **actionable bullet points**. 
-        Use the following style guidelines:
-        - Drop features only if clearly unusable (e.g., >70% missing).
-        - Recommend specific imputation strategies (e.g., median, group-based).
-        - Suggest simple, interpretable feature engineering (e.g., FamilySize = SibSp + Parch).
-        - Flag overfitting risks if n < 200 or many features vs. rows.
-        - Always mention validating models with k-fold cross-validation (esp. RF/LogReg).
+        Style rules:
+        - Each bullet must start with a **verb** (Drop, Impute, Engineer, Validate, Beware).  
+        - Drop features only if clearly unusable (e.g., >70% missing).  
+        - Recommend specific imputation strategies (e.g., median, group-based).  
+        - Suggest simple, interpretable feature engineering (e.g., FamilySize = SibSp + Parch).  
+        - Flag overfitting risks if n < 200 or many features vs. rows.  
+        - Always end with a validation bullet: “Validate models carefully with k-fold CV (esp. RF/LogReg).”  
         {recommendations}
 
         ## Notes
-        - **Excluded columns:** {excluded_note}
+        - ⚠️ **Excluded columns:** {excluded_note}
         - If any section lacked inputs, note it as **N/A** and proceed without guessing.
         """
-
 
     prompt = PromptTemplate(
         template=template.strip(),
