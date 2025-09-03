@@ -10,8 +10,8 @@ seaborn
 langchain==0.2.*
 langchain-core==0.2.*
 langchain-ollama==0.1.*
-langchain-openai>=0.1.0
-openai>=1.0.0
+langchain-openai==0.1.*
+openai==1.*
 
 PyYAML
 typing-extensions

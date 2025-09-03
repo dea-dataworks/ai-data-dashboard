@@ -34,7 +34,7 @@ Built with Streamlit, scikit‑learn, and a structured LLM report (Ollama by def
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 > Tested with **Python 3.12–3.13** on Windows/macOS/Linux.
 
@@ -59,7 +59,7 @@ streamlit run app.py
 ```
 Then open the local URL that Streamlit prints (usually http://localhost:8501).
 
-### 🔮 LLM Providers
+### LLM Providers
 
 By default, the dashboard uses **Ollama (local Mistral)**. You can also enable **OpenAI (cloud)** if you have an API key.  
 
@@ -84,7 +84,7 @@ By default, the dashboard uses **Ollama (local Mistral)**. You can also enable *
 
 ---
 
-## 📦 Project Structure (typical)
+## Project Structure (typical)
 
 ```
 <repo-root>/
@@ -100,7 +100,10 @@ By default, the dashboard uses **Ollama (local Mistral)**. You can also enable *
 │  └─ insurance.csv
 ├─ assets/
 │  ├─ demo.gif
+│  ├─ eda.gif
+│  ├─ ml.gif
 │  └─ screenshots/
+│     ├─ preview.png
 │     ├─ eda.png
 │     ├─ ml.png
 │     └─ report.png
@@ -110,35 +113,23 @@ By default, the dashboard uses **Ollama (local Mistral)**. You can also enable *
 ├─ CHANGELOG.md
 └─ .gitignore
 ```
-> Adjust as needed to match your repo.
 
 ---
 
-## 🖼️ Screenshots
+## Screenshots
 
-| EDA Snapshot | ML Insights | LLM Report |
-| --- | --- | --- |
-| ![EDA](assets/screenshots/eda.png) | ![ML](assets/screenshots/ml.png) | ![Report](assets/screenshots/report.png) |
-
-> Optional extras: value counts, outlier plots, feature importance chart.
+| Preview Snapshot | EDA Snapshot | ML Insights | LLM Report |
+| --- | --- | --- | --- |
+|![PREVIEW](assets/screenshots/preview.png) | ![EDA](assets/screenshots/eda.png) | ![ML](assets/screenshots/ml.png) | ![Report](assets/screenshots/report.png) |
 
 ---
 
-## 🎬 Demo GIF (≤45s)
+### Extra GIFs
 
-**Recommended flow:**  
-1) Upload `titanic.csv` → 2) Show EDA snapshot → 3) Pick target & run models → 4) Open LLM Report.  
-Keep it under **45s** and ≤10–12 MB for GitHub friendliness.
+- [EDA expanders demo (GIF)](assets/eda.gif)  
+- [ML expanders demo (GIF)](assets/ml.gif)
 
-**Tips**
-- Use a clean, readable theme (consistent font/plot size).
-- Keep the mouse movement slow and purposeful.
-- Trim with your editor (or `ffmpeg`) and export to GIF.
-- Save to `assets/demo.gif` and ensure relative link in README is correct.
-
----
-
-## 🛠️ Notes & Configuration
+## Notes & Configuration
 
 - **Random seed:** For reproducible results in ML tab.
 - **CV folds:** Optional 5‑fold cross‑validation for stable metrics.
@@ -147,7 +138,7 @@ Keep it under **45s** and ≤10–12 MB for GitHub friendliness.
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 - **v0.3 (ideas):**
   - Polished “Key patterns & signals” (with robust numeric/categorical handling)
@@ -159,13 +150,13 @@ See `ROADMAP.md` for the live plan.
 
 ---
 
-## 📄 License
+## License
 
 This project is released under the **MIT License**. See `LICENSE` for details.
 
 ---
 
-## 🙌 Acknowledgments
+## Acknowledgments
 
 - Titanic: Kaggle open dataset (trimmed sample).
 - Insurance: public sample dataset (charges vs features).
