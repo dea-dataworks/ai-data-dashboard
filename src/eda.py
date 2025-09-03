@@ -8,7 +8,6 @@ from sklearn.feature_selection import mutual_info_classif, mutual_info_regressio
 from matplotlib import font_manager as fm, rcParams
 from pathlib import Path
 
-
 # ---- Font ----
 f = Path(__file__).resolve().parent / "fonts" / "Inter-VariableFont_opsz,wght.ttf"
 FONT_STACK = ["DejaVu Sans"]
@@ -47,7 +46,6 @@ def get_style_params(compact: bool) -> dict:
     so figsize differences won't be noticeable — that's expected.
     """
     BINS = 30           # unified bins (the only real change)
-    #BASE = (7.8, 4.4)   # one medium baseline for everything
 
     return {
         #"figsize": (6.5, 3.6) if compact else (8.8, 4.8),
@@ -161,43 +159,7 @@ def show_summary(df: pd.DataFrame):
         height=320
     )
 
-    # # --- Side-by-side compact tables: Missing | High-Cardinality ---
-    # c1, c2 = st.columns(2)
-
-    # # Missing table (Count + %)
-    # with c1:
-    #     st.markdown("**Missing values by column**")
-    #     missing_counts = df.isnull().sum()
-    #     missing_df = missing_counts[missing_counts > 0].sort_values(ascending=False).to_frame("Count")
-    #     if not df.empty:
-    #         total_rows = len(df)
-    #     else:
-    #         total_rows = 0
-    #     if total_rows > 0 and not missing_df.empty:
-    #         missing_df["Pct %"] = (missing_df["Count"] / total_rows * 100).round(2)
-    #         st.dataframe(missing_df, use_container_width=True, height=260)
-    #     else:
-    #         st.info("No missing values found in the dataset! 🎉")
-
-    # # High-cardinality table (Top-5 text columns)
-    # with c2:
-    #     st.markdown("**Top-5 High-Cardinality Text Columns**")
-    #     cat_cols = df.select_dtypes(include=["object", "category", "string"]).columns
-    #     if len(cat_cols) > 0:
-    #         card = (
-    #             df[cat_cols]
-    #             .nunique(dropna=True)
-    #             .sort_values(ascending=False)
-    #             .head(5)
-    #             .rename("unique_values")
-    #             .to_frame()
-    #         )
-    #         st.dataframe(card, use_container_width=True, height=260)
-    #     else:
-    #         st.info("No object/category/string columns detected.")
-
-# missing values and high cardinality
- # --- Side-by-side compact tables: Missing | High-Cardinality ---
+# --- Side-by-side compact tables: Missing | High-Cardinality ---
     
 def show_missing_cardinality(df):
     st.caption("Highlights variables with missing data or excessive unique values that may affect modeling.")
@@ -233,25 +195,6 @@ def show_missing_cardinality(df):
             st.dataframe(card, use_container_width=True, height=260)
         else:
             st.info("No object/category/string columns detected.")
-
-# missing value
-# def show_missing(df):
-#     st.subheader("Missing Values")
-#     st.write("This table identifies columns with **missing data** (NaN values) and shows the **count of missing entries** for each. Columns not listed here have no missing values.")
-    
-#     missing_counts = df.isnull().sum()
-
-#     # Filter for columns with missing values and convert to DataFrame
-#     missing_df = missing_counts[missing_counts > 0].to_frame()
-
-#     # Rename the column from '0' to 'Missing Count'
-#     missing_df.columns = ['Count']
-
-#     # Display only if there are missing values
-#     if not missing_df.empty:
-#         st.dataframe(missing_df)
-#     else:
-#         st.info("No missing values found in the dataset! 🎉")
 
 # correlation
 def show_correlation(df):
@@ -306,12 +249,6 @@ def plot_distributions(df):
         "features using **histograms**."
         "Histograms show the frequency of data points within specific bins."
     )
-
-    # col = st.selectbox(
-    #     "Select a numeric column",
-    #     df.select_dtypes(include=["int64", "float64"]).columns,
-    #     key="eda_plot_distributions_numeric_select",
-    # )
 
     num_candidates = df.select_dtypes(include=["int64", "float64"]).columns
     numeric_cols = [c for c in num_candidates if df[c].nunique() > 2]

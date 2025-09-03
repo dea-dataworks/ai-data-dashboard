@@ -218,19 +218,6 @@ def llm_report_tab(
     # Model lists / metrics formatting
     model_list: List[str] = list(model_metrics.keys()) if model_metrics else []
     model_metrics_str = _fmt_dict(model_metrics or {}, max_items=20)
-    # feature_importances = _top_items(feature_importances or {}, k=15)
-    # feature_importances_str = _fmt_dict(feature_importances, max_items=15)
-
-    # # Feature importances: pass only the top-5 names (no numbers) to encourage interpretation
-    # fi_dict = _top_items(feature_importances or {}, k=5)
-    # def _clean_feat_name(name: str) -> str:
-    #     # strip common pipeline prefixes to make names nicer in prose
-    #     for pre in ("num__", "cat__", "text__", "bin__"):
-    #         if name.startswith(pre):
-    #             return name[len(pre):]
-    #     return name
-    # fi_names = [ _clean_feat_name(n) for n, _ in sorted(fi_dict.items(), key=lambda x: float(x[1]), reverse=True) ]
-    # fi_names_str = ", ".join(fi_names)
 
     # Build finalized, human-friendly Feature Drivers (ranked, top-3, one-hot collapsed)
     feature_drivers_md = _feature_drivers_markdown(feature_importances, dataset_name, top_k=3)
@@ -326,13 +313,11 @@ def llm_report_tab(
         "models_table_md": models_table_md or "Not run.",
         "shape": _shape_pretty(df),
         "column_types": _fmt_dict(col_types, max_items=50),
-        #"sample_columns": _key_vars_human(df),
         "sample_columns": _key_vars_human(df.drop(columns=excluded_columns or [], errors="ignore")),
         "target": target or "not specified",
         "class_balance": _fmt_dict(class_balance, max_items=20) if class_balance else "not available",
         "missing_values": _fmt_dict(missing_vals, max_items=50) if missing_vals else "no missing values",
         "correlations": correlations_sent,
-        #"feature_importances": (fi_names_str if fi_names else "not available"),
         "feature_drivers_md": feature_drivers_md,
         "model_list": ", ".join(model_list) if model_list else "not available",
         "model_metrics": model_metrics_str if model_metrics else "not available",
@@ -528,10 +513,6 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
                 st.caption("Using results from **ML Insights** (last run).")
     else:
         st.caption("Tip: Leave modeling off to generate an EDA-only report.")
-
-    # excluded_cols = st.session_state.get("ml_excluded_cols", [])     
-    # if excluded_cols:
-    #     st.caption(f"⚠️ The following columns were excluded from modeling: {', '.join(excluded_cols)}")
 
     # ---- BUTTON (enabled only when cache is valid) ----
     can_generate = (not include_modeling) or (status == "ok")

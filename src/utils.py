@@ -337,35 +337,6 @@ def sidebar_global_settings():
     st.sidebar.checkbox("Show Excel downloads",value=st.session_state.get("dl_excel_global", False), key="dl_excel_global",
     help="When on, all tables show an Excel button alongside CSV.")
 
-    
-
-# def sidebar_llm_settings():
-#     st.subheader("LLM Provider")
-#     openai_available = _openai_is_available()
-
-#     help_txt = None if openai_available else (
-#         "OpenAI disabled (missing package or API key). Install `langchain_openai` and set OPENAI_API_KEY."
-#     )
-
-#     provider = st.radio("Provider", ["Ollama (local)", "OpenAI (cloud, API key required)"], index=0, help=help_txt)
-
-#     if provider == "OpenAI (cloud, API key required)" and not openai_available:
-#         st.warning("OpenAI is not configured; falling back to **Ollama**.")
-#         provider = "Ollama (local)"
-#     if provider == "Ollama (local)":
-#         ollama_model = st.selectbox("Ollama model", options=["mistral"], index=0)
-#         openai_model = "gpt-4o-mini"
-#     else:
-#         openai_model = st.selectbox("OpenAI", options=["gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"], index=0)
-#         ollama_model = "mistral"
-
-#     # expose globally
-#     st.session_state["llm_provider"] = provider
-#     st.session_state["ollama_model"] = ollama_model
-#     st.session_state["openai_model"] = openai_model
-#     st.session_state["openai_available"] = openai_available
-
-
 def sidebar_llm_settings():
     st.subheader("LLM Provider")
     openai_available = _openai_is_available()

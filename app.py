@@ -1,9 +1,7 @@
-#import os
 from pathlib import Path
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-#from matplotlib import font_manager as fm
 import src.utils as utils
 import src.eda as eda
 import src.ml_models as ml
@@ -113,7 +111,6 @@ if st.session_state.df is not None:
                 "Select target variable",
                 target_choices,
                 index=0,
-                #help="Pick the column to predict. Choose a categorical label for classification or a numeric one for regression."
                 help = "This is the column the model will try to predict. Pick a categorical column for classification (e.g., Yes/No) or a numeric column for regression (e.g., Price)."
             )
 
@@ -308,9 +305,6 @@ if st.session_state.df is not None:
                             summary_df_table = summary_df.map(lambda x: f"{x:.3f}" if isinstance(x, float) else x)
                             st.write("#### Performance Summary")
                             st.caption("Compares baseline (Dummy) with Logistic Regression and Random Forest. Reports accuracy, F1-score, and ROC AUC.")
-                            # st.caption("**Accuracy**: Proportion of correctly classified samples.")
-                            # st.caption("**F1 Score (weighted)**: Harmonic mean of precision and recall, weighted by class frequency.")
-                            # st.caption("**ROC AUC**: Measures how well the model separates classes.")
                             st.table(summary_df_table.set_index("Model"))
                             df_download_buttons("test-metrics", summary_df, base=dataset_name, excel=excel_pref)
 
@@ -384,20 +378,6 @@ if st.session_state.df is not None:
                                 - **Recall**: Among actual positives, proportion predicted correctly.
                                 """)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                         # ---- Regression ----
                         elif task_type == "regression":
                             summary_data = []
@@ -450,7 +430,6 @@ if st.session_state.df is not None:
 
                             # Model Diagnostics Visuals
                             with st.expander("Model Diagnostics (Visuals)"):
-                                #st.caption("Residuals vs Fitted highlights potential bias and heteroscedasticity, while the Prediction Error Plot compares predicted against actual values to assess overall model fit")
                                 st.caption("**Residuals vs Fitted**: Plots residuals against predicted values to reveal bias, non-linearity, or heteroscedasticity. A random scatter around zero indicates a well-fitted model.")
                                 st.caption("**Prediction Error Plot**: Compares predicted against actual values. Points close to the diagonal line indicate accurate predictions, while large deviations signal poor fit.")
                                 if y_test is None:
@@ -494,7 +473,6 @@ if st.session_state.df is not None:
                                         - **MAE**: Mean Absolute Error.
                                         - **R²**: Proportion of variance explained.
                                         """)
-
                 except ValueError as e:
                     st.error(str(e))
                 except Exception as e:
@@ -519,4 +497,3 @@ if st.session_state.df is not None:
         reset_app()
         st.rerun() # Rerun the app to reflect the reset state
 
-#streamlit run ai-data-dashboard/app.py
