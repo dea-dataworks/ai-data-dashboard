@@ -1,12 +1,9 @@
-# src/utils.py
 from __future__ import annotations
 import os
 import pandas as pd
 from datetime import datetime
 from io import StringIO, BytesIO
 import streamlit as st
-
-#from .data_preprocess import preprocess_df
 from .ml_models import train_and_evaluate
 from .eda import get_style_params, PlotStyle, stylize_axes
 import matplotlib.pyplot as plt

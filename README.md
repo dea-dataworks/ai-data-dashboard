@@ -7,36 +7,33 @@ Built with Streamlit, scikit‑learn, and a structured LLM report (Ollama by def
 
 ---
 
-## ✨ Key Features (v0.2)
+## Key Features (v0.2)
 
-- **Dataset Snapshot (EDA)**
-  - Rows × columns, dtype counts, memory footprint
-  - Missing values table & top high‑cardinality columns
-  - Value counts & categorical distributions
-  - Outlier checks (quick visual scanning)
+- **Dataset Preview & EDA**
+  - Quick dataset snapshot: shape, dtypes, memory, missing values
+  - Automatic visualizations: distributions, outlier scans, high-cardinality detection
 
-- **ML Insights (Classification & Regression)**
-  - Baselines + sensible defaults (Dummy, Logistic Regression, Random Forest)
-  - Optional 5‑fold CV; summary and advanced metrics tables
-  - **Diagnostics:** Classification — Confusion Matrix, ROC Curve; Regression — Residuals vs Fitted, Prediction Error
-  - **Exports:** metrics to CSV/Excel; plots as PNG
-  - **Feature Importances:** Random Forest top‑k bar; "Exclude columns" control
+- **Machine Learning Insights**
+  - Built-in models (Dummy, Logistic Regression, Random Forest)
+  - One-click metrics & diagnostics: confusion matrix, ROC, residuals, prediction error
+  - Optional cross-validation, feature importances, and column exclusion
+  - Export results (metrics → CSV/Excel, plots → PNG)
 
-- **LLM Report (Tab)**
-  - Clean, structured Markdown: snapshot, data quality notes, (optional) key patterns, **modeling summary**, and **feature drivers**
-  - Uses **Ollama (Mistral)** by default; optional **OpenAI** provider toggle
-  - Handles edge cases (no target/no models) with helpful guidance
+- **LLM-Powered Report**
+  - Structured Markdown with dataset snapshot, data quality notes, modeling summary, and feature drivers
+  - Runs locally via **Ollama (Mistral)** or optionally via **OpenAI API**
 
-- **Nice touches**
-  - Sidebar tooltips; compact vs standard plot sizes
-  - Consistent captions & explanations for metrics and diagnostics
-  - Sample datasets included (Titanic, Insurance) for instant demo
+- **Streamlined UX**
+  - Sidebar tooltips, compact/standard plot sizing
+  - Consistent captions & metric explanations
+  - Dark/light theme friendly
+  - Sample datasets included for instant demo
 
 ---
 
 ## Quick Start
 
-> Tested with **Python 3.12–3.13** on Windows/macOS/Linux.
+> Tested with **Python 3.12–3.13** on Windows.
 
 ```bash
 # 1) Clone
@@ -159,11 +156,11 @@ This project is released under the **MIT License**. See `LICENSE` for details.
 ## Acknowledgments
 
 - Titanic: Kaggle open dataset (trimmed sample).
-- Insurance: public sample dataset (charges vs features).
+- Medical Cost: Kaggle open dataset (trimmed sample).
 
 ---
 
 ## 🔗 Links
 
-- Project Page: <link to repo>
-- Author: <your name / website / LinkedIn>
+- Project Page: https://github.com/dea-dataworks/ai-data-dashboard
+- Author: Daniel E. Alarcon/ https://www.linkedin.com/in/daniel-e-alarcon
