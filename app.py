@@ -376,6 +376,9 @@ if st.session_state.df is not None:
                                 - **ROC AUC**: Measures how well the model separates classes.
                                 - **Precision**: Among predicted positives, proportion actually positive.
                                 - **Recall**: Among actual positives, proportion predicted correctly.
+                                - **Support**: Number of true instances for each class in the dataset.
+                                - **Macro Avg**: Metric calculated independently for each class, then averaged equally; treats all classes the same regardless of size.
+                                - **Weighted Avg**: Metric averaged across classes, weighted by their support; accounts for class imbalance.
                                 """)
 
                         # ---- Regression ----
@@ -466,12 +469,20 @@ if st.session_state.df is not None:
 
                                     if not any_plotted:
                                         st.info("No predictions found to plot diagnostics.")
-                            with st.expander("📖 Metric Definitions"):
+                            with st.expander("Metric Definitions"):
                                 st.markdown("""
-                                        - **MSE**: Mean Squared Error.
-                                        - **RMSE**: Root Mean Squared Error.
-                                        - **MAE**: Mean Absolute Error.
-                                        - **R²**: Proportion of variance explained.
+                                        - **MSE**: Mean Squared Error. Average of squared differences between predicted and actual values; penalizes larger errors more strongly.
+                                        - **RMSE**: Root Mean Squared Error. Root Mean Squared Error. Square root of MSE; interpretable in the same units as the target variable.
+                                        - **MAE**: Mean Absolute Error. Average of absolute differences between predicted and actual values; robust to outliers compared to MSE.
+                                        - **R²**: Coefficient of Determination. Proportion of variance in the target explained by the model (1 = perfect, 0 = baseline).
+                                        - **MAPE (%)**: Mean Absolute Percentage Error. Average percentage difference between predicted and actual values.
+                                        - **Median AE**: Median Absolute Error. The median of absolute differences; less sensitive to outliers than MAE.
+                                        - **Max Error**: Largest absolute difference between predicted and actual values; highlights worst-case performance.
+                                        - **RMSLE**: Root Mean Squared Logarithmic Error. Computes squared log differences, penalizing underestimation more than overestimation; useful for targets with exponential growth or skew.
+
+
+
+
                                         """)
                 except ValueError as e:
                     st.error(str(e))
