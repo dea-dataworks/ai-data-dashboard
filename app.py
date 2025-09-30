@@ -11,7 +11,7 @@ from src.utils import df_download_buttons, fig_download_button
 
 
 # Set page configuration
-st.set_page_config(page_title="AI Data Insight Dashboard", layout="wide")
+st.set_page_config(page_title="AI Data Insight Dashboard", layout="centered")
 st.title("AI Data Insight Dashboard")
 
 # --- Sidebar: Global Settings ---
