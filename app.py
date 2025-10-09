@@ -329,7 +329,7 @@ if st.session_state.df is not None:
                                         fig = utils.plot_feature_importances(metrics["feature_importances"])
                                         if fig:
                                             st.markdown(f"**{model}**")
-                                            st.pyplot(fig, use_container_width=False)
+                                            st.pyplot(fig, width='content')
                                             fig_download_button(f"{model}-rf-importances", fig, base=dataset_name)
 
                             # Diagnostics
@@ -347,13 +347,13 @@ if st.session_state.df is not None:
                                     with col1:
                                         st.caption("• Confusion Matrix")
                                         cm_fig = utils.plot_confusion_matrix(y_test, preds, labels=sorted(pd.Series(y_test).unique()))
-                                        st.pyplot(cm_fig, use_container_width=False)
+                                        st.pyplot(cm_fig, width='content')
                                     with col2:
                                         st.caption("• ROC Curve")
                                         roc_fig = None
                                         if probs is not None and pd.Series(y_test).nunique() == 2:
                                             roc_fig = utils.plot_roc_curve(y_test, probs)
-                                            st.pyplot(roc_fig, use_container_width=False)
+                                            st.pyplot(roc_fig, width='content')
                                         else:
                                             st.info("ROC not available (needs binary target and probability scores).")
 
@@ -428,7 +428,7 @@ if st.session_state.df is not None:
                                         fig = utils.plot_feature_importances(fi)
                                         if fig:
                                             st.markdown(f"**{model}**")
-                                            st.pyplot(fig, use_container_width=False)
+                                            st.pyplot(fig, width='content')
                                             fig_download_button(f"{model}-rf-importances", fig, base=dataset_name)
 
                             # Model Diagnostics Visuals
@@ -452,10 +452,10 @@ if st.session_state.df is not None:
                                         col1, col2 = st.columns(2)
                                         with col1:
                                             st.caption("• Residuals vs Fitted")
-                                            st.pyplot(figs[0], use_container_width=False)
+                                            st.pyplot(figs[0], width='content')
                                         with col2:
                                             st.caption("• Prediction Error Plot")
-                                            st.pyplot(figs[1], use_container_width=False)
+                                            st.pyplot(figs[1], width='content')
 
                                         b1, b2 = st.columns(2)
                                         with b1:

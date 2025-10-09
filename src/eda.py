@@ -155,7 +155,7 @@ def show_summary(df: pd.DataFrame):
     # Main stats table
     st.dataframe(
         df.describe(include="all").T,
-        use_container_width=True,
+        width='stretch',
         height=320
     )
 
@@ -175,7 +175,7 @@ def show_missing_cardinality(df):
             total_rows = 0
         if total_rows > 0 and not missing_df.empty:
             missing_df["Pct %"] = (missing_df["Count"] / total_rows * 100).round(2)
-            st.dataframe(missing_df, use_container_width=True, height=260)
+            st.dataframe(missing_df, width='stretch', height=260)
         else:
             st.info("No missing values found in the dataset! 🎉")
 
@@ -192,7 +192,7 @@ def show_missing_cardinality(df):
                 .rename("unique_values")
                 .to_frame()
             )
-            st.dataframe(card, use_container_width=True, height=260)
+            st.dataframe(card, width='stretch', height=260)
         else:
             st.info("No object/category/string columns detected.")
 
@@ -236,7 +236,7 @@ def show_correlation(df):
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
         ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
 
-        st.pyplot(fig, use_container_width=False)
+        st.pyplot(fig, width='content')
         plt.close(fig)
 
 # distributions for numerical
@@ -281,7 +281,7 @@ def plot_distributions(df):
             grid_axis="y"
         )
 
-    st.pyplot(fig, use_container_width=False)
+    st.pyplot(fig, width='content')
     plt.close(fig)
 
 
@@ -321,7 +321,7 @@ def plot_categorical(df):
             grid_axis="y"
         )
         ax.tick_params(axis="x", rotation=30, labelrotation=30)
-        st.pyplot(fig, use_container_width=False)
+        st.pyplot(fig, width='content')
         plt.close(fig)
 
 # --- Boxplot for numeric columns ---
@@ -368,7 +368,7 @@ def show_boxplot(df: pd.DataFrame) -> None:
             lw=params["lw"],
             grid_axis="y",
         )
-        st.pyplot(fig, use_container_width=False)
+        st.pyplot(fig, width='content')
         plt.close(fig)
 
 # --- Value counts for categorical columns ---
