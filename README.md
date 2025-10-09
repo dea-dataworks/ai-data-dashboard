@@ -132,6 +132,7 @@ By default, the dashboard uses **Ollama (local Mistral)**. You can also enable *
 - **CV folds:** Optional 5‑fold cross‑validation for stable metrics.
 - **Exports:** Metrics tables → CSV/Excel; plots → PNG (aligned dpi).
 - **Excluded columns:** RF importances ignore columns you mark as excluded; LLM report will note exclusions.
+- This app runs without secrets. If you want to use a cloud LLM later, copy .env.example to .env and fill in values.
 
 ---
 

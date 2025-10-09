@@ -416,7 +416,7 @@ if st.session_state.df is not None:
                                             metrics.get("rmsle", float("nan")),
                                         ],
                                     })
-                                    st.dataframe(adv_df.style.format({"value": "{:.3f}"}), use_container_width=True)
+                                    st.dataframe(adv_df.style.format({"value": "{:.3f}"}), width='stretch')
                                     df_download_buttons(f"{model}-advanced-metrics", adv_df, base=dataset_name, excel=excel_pref)
 
                             # Feature Importances
