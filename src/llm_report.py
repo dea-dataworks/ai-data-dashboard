@@ -223,7 +223,36 @@ def llm_report_tab(
 
     # Build finalized, human-friendly Feature Drivers (ranked, top-3, one-hot collapsed)
     feature_drivers_md = _feature_drivers_markdown(feature_importances, dataset_name, top_k=3)
- 
+    
+    # Decide if we have modeling artifacts
+    has_models = bool(models_table_md and models_table_md.strip())
+    has_target = bool(target)
+
+    if not (has_models and has_target):
+        # Forcefully mark modeling unavailable to stop hallucinations
+        models_table_md = ""
+        feature_drivers_md = "N/A"
+
+    # Build a modeling section string that we can drop into the template
+    if has_models and has_target:
+        modeling_section = f"""
+            ## 3) Modeling Summary
+            Write 1–2 sentences comparing model performance **strictly using the metrics table below**.  
+            Rules (mandatory):  
+            - Always state that the Dummy Classifier is the weakest baseline.  
+            - If two or more models outperform Dummy, describe trade-offs (e.g., “RF higher Accuracy/F1, LR slightly stronger ROC AUC”).  
+            - Use only qualitative terms: “slightly higher,” “comparable,” “clearly stronger.”  
+            - Do **not** claim one model is better on all metrics unless the table supports it.  
+            - Never invent or restate exact numbers; the table speaks for itself.  
+            Then present the table verbatim.
+
+            {models_table_md}
+        """
+    else:
+        modeling_section = """
+            ## 3) Modeling Summary
+            **N/A** (modeling not included or not available). Do not invent numbers or tables.
+        """
 
     template = """
         You are a precise data analyst. Write a concise, client-ready **Markdown** report.
@@ -261,16 +290,7 @@ def llm_report_tab(
         **Missing values (top) input:**  
         {missing_values}
 
-        ## 3) Modeling Summary
-        Write 1–2 sentences comparing model performance **strictly using the metrics table below**.  
-        Rules (mandatory):  
-        - Always state that the Dummy Classifier is the weakest baseline.  
-        - If two or more models outperform Dummy, describe trade-offs (e.g., “RF higher Accuracy/F1, LR slightly stronger ROC AUC”).  
-        - Use only qualitative terms: “slightly higher,” “comparable,” “clearly stronger.”  
-        - Do **not** claim one model is better on all metrics unless the table supports it.  
-        - Never invent or restate exact numbers; the table speaks for itself.  
-        Then present the table verbatim.  
-        {models_table_md}
+        {modeling_section}
 
         ## 4) Feature Drivers (ranked by RF importance)
         Rewrite the input below as a **Markdown numbered list (1., 2., 3.)**.  
@@ -305,7 +325,7 @@ def llm_report_tab(
             "dataset_name", "shape", "column_types", "sample_columns", "target",
             "class_balance", "missing_values", "correlations",
             "model_list", "model_metrics", "recommendations", "models_table_md",
-            "excluded_note", "feature_drivers_md"
+            "excluded_note", "feature_drivers_md", "modeling_section"
         ],
     )
 
@@ -325,6 +345,7 @@ def llm_report_tab(
         "model_metrics": model_metrics_str if model_metrics else "not available",
         "recommendations": recommendations,
         "excluded_note": (", ".join(excluded_columns) if excluded_columns else "None"),
+        "modeling_section": modeling_section,
      }
     
     # ---- Runnable pipeline: prompt | llm | StrOutputParser ----
