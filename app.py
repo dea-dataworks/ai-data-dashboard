@@ -56,7 +56,8 @@ if st.session_state.df is None:
                 st.session_state.pop(k, None)
 
                 #LOGGING INFO
-                logging.info("Cleared ML cache after new upload.")
+                if uploaded_file and "ml_output" in st.session_state:
+                    logging.info("Cleared ML cache after new upload.")
 
             st.success("File uploaded and processed successfully!")
             st.rerun()                  # Rerun to display the content immediately with the new df
