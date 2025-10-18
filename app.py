@@ -9,6 +9,9 @@ from src.ml_models import train_and_evaluate
 import src.llm_report as llm_report
 from src.utils import df_download_buttons, fig_download_button
 
+# LOGGING INFO
+import logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 # Set page configuration
 st.set_page_config(page_title="AI Data Insight Dashboard", layout="centered")
@@ -40,13 +43,20 @@ if st.session_state.df is None:
             else:
                 df = pd.read_excel(uploaded_file)
             
-            st.session_state.df = df    # Store the dataframe in session state
+            st.session_state.df = df    # Store the dataframe in session state            
             st.session_state.dataset_name = Path(uploaded_file.name).stem
+
+            # LOGGING INFO
+            logging.info(f"File uploaded: {uploaded_file.name}, shape={df.shape}")
+
             # Clear ML cache on dataset change
             for k in ("ml_output","ml_models_table_md","ml_rf_importances",
                     "ml_signature","ml_target","ml_excluded_cols",
                     "ml_cv_used","ml_cv_folds"):
                 st.session_state.pop(k, None)
+
+                #LOGGING INFO
+                logging.info("Cleared ML cache after new upload.")
 
             st.success("File uploaded and processed successfully!")
             st.rerun()                  # Rerun to display the content immediately with the new df
@@ -66,13 +76,19 @@ if st.session_state.df is not None:
     tab1, tab2, tab3, tab4 = st.tabs(["Upload & Preview", "EDA", "ML Insights", "LLM Report"])
 
     with tab1:
-        st.subheader("Dataset Preview")
+        #LOGGING INFO
+        logging.info("Entered Tab 1 — Upload & Preview")
+
+        st.subheader("Dataset Preview")      
         st.write(f"Shape: {df.shape[0]} rows x {df.shape[1]} columns")
         st.dataframe(df.head(10))
 
     with tab2:
+        #LOGGING INFO
+        logging.info("Entered Tab 2 — EDA")
+
         st.subheader("Exploratory Data Analysis")
-        
+
         with st.expander("Data Quality Warnings", expanded=True):
             eda.show_data_quality_warnings(df, target=st.session_state.get("ml_target"))
 
@@ -102,8 +118,10 @@ if st.session_state.df is not None:
             eda.show_boxplot(df)
 
     with tab3:
-        st.subheader("Machine Learning")
+        # LOGGING INFO
+        logging.info("Entered Tab 3 — ML Insights")
 
+        st.subheader("Machine Learning")
         if df is not None:
             # --- 1) Target select: start EMPTY (no auto-run) ---
             target_choices = ["— Select target —"] + list(df.columns)
@@ -169,6 +187,10 @@ if st.session_state.df is not None:
                 st.info("Select a target, configure exclusions/CV, then click **Run models**.")
 
             elif should_render:
+                
+                # LOGGING INFO
+                logging.info(f"Starting modeling — target={target}, exclusions={exclude_cols}, use_cv={use_cv}")
+
                 try:
                     # --- Prepare data only if we will train now (no need when using cache) ---
                     if not use_cache:
@@ -185,6 +207,10 @@ if st.session_state.df is not None:
                         else:
                             cv_out    = ml.cross_validate_models(X, y, cv_splits=cv_folds)
                             task_type = cv_out["task_type"]
+
+                            # LOGGING INFO
+                            logging.info(f"Completed cross-validation — task={task_type}, models={list(cv_out['results'].keys())}")
+
 
                             # --- Cache outputs + signature for re-render ---
                             st.session_state["ml_output"]    = cv_out
@@ -248,6 +274,11 @@ if st.session_state.df is not None:
                         else:
                             output    = ml.train_and_evaluate(X, y, target)
                             task_type = output["task_type"]
+
+                            # LOGGING INFO
+                            logging.info(f"Completed single-split modeling — task={task_type}, models={list(output['results'].keys())}")
+
+
                             y_test    = output["y_test"]
 
                             # --- Cache outputs + signature for re-render ---
@@ -493,6 +524,9 @@ if st.session_state.df is not None:
                 st.info("Ready. Click **Run models** to train/evaluate with the current settings.")
            
     with tab4:
+        # LOGGING INFO
+        logging.info("Entered Tab 4 — LLM Report")
+
         llm_report.render_llm_tab(
             df,
             default_name=st.session_state.get("dataset_name", "Dataset")
@@ -505,6 +539,9 @@ if st.session_state.df is not None:
 if st.session_state.df is not None:
     st.markdown("---") # Add a separator before the reset button for better UI
     if st.button("Reset Application"):
+        # LOGGING INFO
+        logging.info("Reset button clicked — clearing session state.")
+
         reset_app()
         st.rerun() # Rerun the app to reflect the reset state
 

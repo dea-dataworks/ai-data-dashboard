@@ -13,6 +13,8 @@ try:
 except Exception:
     _OPENAI_OK = False
 
+import logging
+
 # ---- Safe helper: get OpenAI key without crashing when secrets.toml is missing
 def _get_openai_key() -> str | None:
     try:
@@ -520,6 +522,9 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
 
     if clicked:
         with st.spinner("Analyzing dataset with AI..."):
+            # LOGGING INFO
+            logging.info(f"Generating LLM report for dataset={dataset_name}, provider={provider}")
+
             report_text = llm_report_tab(
                 df=df,
                 dataset_name=dataset_name or "Dataset",
