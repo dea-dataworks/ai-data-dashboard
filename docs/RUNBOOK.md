@@ -48,3 +48,27 @@ ollama==0.2.1
 |------|---------|--------|
 | 2025-10-09 | Fresh venv test | ✅ Pass |
 | _Next_ | (update only if env or key dep changes) | |
+
+
+# === Merge feature branch into main ===
+# 1. Move to main
+git checkout main
+
+# 2. Update local main with remote
+git pull
+
+# 3. Merge your branch into main
+git merge <your-branch-name>
+
+# 4. Push updated main to remote
+git push origin main
+
+# 5. (Optional) Delete local branch after successful merge
+git branch -d <your-branch-name>
+
+Notes 
+
+- Always pull first — keeps your local main current.
+- Run and smoke-test the app before pushing.
+- Use git log --oneline --graph to confirm the merge history looks clean.
+- If conflicts appear, Git will prompt you; resolve them, then git add . + git commit to finalize the merge.
