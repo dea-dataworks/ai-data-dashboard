@@ -1,21 +1,25 @@
 """LLM report module — generates structured Markdown summaries using LLM prompts."""
 
-from typing import Dict, Any, Optional, List
+import logging
+import os
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pandas as pd
-import os
+import streamlit as st
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-import streamlit as st
-import src.utils as utils
 from langchain_ollama import OllamaLLM
+
 try:
     from langchain_openai import ChatOpenAI
     _OPENAI_OK = True
 except Exception:
     _OPENAI_OK = False
 
-import logging
+import src.utils as utils
+
+# TODO(v0.3): integrate unified error handler for LLM/report generation.
 
 # ---- Safe helper: get OpenAI key without crashing when secrets.toml is missing
 def _get_openai_key() -> str | None:
@@ -142,6 +146,7 @@ def _collapse_one_hot_importances(fi: Optional[Dict[str, float]]) -> list[tuple[
     aggregated.sort(key=lambda t: t[1], reverse=True)
     return aggregated
 
+# TODO(v0.3): make feature interpretation dataset-agnostic (external YAML or config).
 def _interpret_driver(name: str, dataset_name: str) -> str:
     """Tiny interpretation layer; Titanic-aware, generic otherwise."""
     ds = (dataset_name or "").lower()
@@ -321,6 +326,7 @@ def llm_report_tab(
         - If any section lacked inputs, note it as **N/A** and proceed without guessing.
         """
 
+    # TODO(v0.3): centralize prompt input variable list for maintainability.
     prompt = PromptTemplate(
         template=template.strip(),
         input_variables=[
@@ -480,6 +486,7 @@ def cached_ml_artifacts(df, dataset_name: str, target: str | None):
     # good to go
     return "ok", models_md, st.session_state.get("ml_rf_importances"), {}
 
+# TODO(v0.3): modularize render_llm_tab sections (UI header, controls, output).
 def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
     """Streamlit UI for the LLM Report tab."""
     st.subheader("LLM Report Generation")
@@ -504,6 +511,7 @@ def render_llm_tab(df: pd.DataFrame, default_name: str = "Dataset") -> None:
     active_model = openai_model if provider == "OpenAI" else ollama_model
     st.caption(f"Provider: **{provider}** · Model: **{active_model}**")
 
+    # TODO(v0.3): allow configurable temperature for both providers.
     # LLM factory with graceful fallback + quota guard
     def make_llm(provider_choice: str):
         if provider_choice == "OpenAI":
