@@ -1,24 +1,38 @@
 """ML models module — training, evaluation, and diagnostics for classification/regression."""
 
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.metrics import (
-    accuracy_score, f1_score, roc_auc_score, classification_report,
-    mean_squared_error, mean_absolute_error, r2_score,
-     ConfusionMatrixDisplay, RocCurveDisplay
-)
-from sklearn.dummy import DummyClassifier, DummyRegressor
-from sklearn.model_selection import cross_val_score, StratifiedKFold, KFold
-from sklearn.metrics import make_scorer, f1_score
-from sklearn.metrics import mean_absolute_percentage_error, median_absolute_error, max_error, mean_squared_log_error
 import numpy as np
 
+from sklearn.compose import ColumnTransformer
+from sklearn.dummy import DummyClassifier, DummyRegressor
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.metrics import (
+    accuracy_score,
+    classification_report,
+    f1_score,
+    make_scorer,
+    max_error,
+    mean_absolute_error,
+    mean_absolute_percentage_error,
+    mean_squared_error,
+    mean_squared_log_error,
+    median_absolute_error,
+    r2_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import (
+    KFold,
+    StratifiedKFold,
+    cross_val_score,
+    train_test_split,
+)
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+# TODO(v0.3): integrate with unified error handler when available.
+# TODO(v0.3): add debug logging for model runs.
 
 def detect_task_type(y: pd.Series) -> str:
     """Detect if target is classification or regression."""
@@ -95,6 +109,7 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
                 "probs": probs,
                 }
 
+            # TODO(v0.3): refactor feature importance extraction to utils.
             if isinstance(model, RandomForestClassifier):
                 try:
                     importances = pipe.named_steps["classifier"].feature_importances_
@@ -143,6 +158,7 @@ def train_and_evaluate(X: pd.DataFrame, y: pd.Series, target_column: str) -> dic
                     results[name]["feature_importances"] = {}
 
     return {"task_type": task_type, "results": results, "y_test": y_test}
+    # TODO(v0.3): document behavior for NaN metrics (MAPE, RMSLE).
 
 
 def cross_validate_models(X: pd.DataFrame, y: pd.Series, cv_splits: int = 5) -> dict:
