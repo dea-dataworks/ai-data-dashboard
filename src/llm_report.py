@@ -1,3 +1,5 @@
+"""LLM report module — generates structured Markdown summaries using LLM prompts."""
+
 from typing import Dict, Any, Optional, List
 import numpy as np
 import pandas as pd

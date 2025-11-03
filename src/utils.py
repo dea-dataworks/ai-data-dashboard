@@ -1,3 +1,5 @@
+"""Utility functions — shared helpers for preprocessing, signatures, and plotting."""
+
 from __future__ import annotations
 import os
 import pandas as pd
