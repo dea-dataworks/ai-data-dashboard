@@ -1,12 +1,16 @@
+"""EDA module — handles exploratory data analysis visuals and quality checks."""
+
+from pathlib import Path
+
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
 import streamlit as st
 from sklearn.feature_selection import mutual_info_classif, mutual_info_regression
 from matplotlib import font_manager as fm, rcParams
-from pathlib import Path
+
+# TODO(v0.3): add optional debug logging (function start, shape).
 
 # ---- Font ----
 f = Path(__file__).resolve().parent / "fonts" / "Inter-VariableFont_opsz,wght.ttf"
@@ -28,6 +32,7 @@ _PRO_PAL = ["#556EE6", "#23A699", "#E66E55", "#8B77AA", "#C3A634", "#3E4C59", "#
 
 # grays and blues
 grays_blues = ["#9AA5B1", "#4A90E2", "#2F5597", "#5B9BD5"]
+# TODO(v0.3): remove unused palettes if not reused elsewhere.
 
 # --- Global Dashboard Theme: Main accent color for all plots (hist bars, boxplots, bar charts, etc.) 
 DASHBOARD_COLOR ="#5B9BD5"
@@ -38,6 +43,7 @@ def _is_dark_theme() -> bool:
     except Exception:
         return False
 
+# TODO(v0.3): move PlotStyle and get_style_params to utils for reuse.
 def get_style_params(compact: bool) -> dict:
     """
     Keep your original styling and visible compact shrink in places where figsize matters (e.g., EDA).
@@ -158,6 +164,7 @@ def show_summary(df: pd.DataFrame):
         width='stretch',
         height=320
     )
+    # TODO(v0.3): limit describe() for large datasets (n_cols > 50).
 
 # --- Side-by-side compact tables: Missing | High-Cardinality ---
     
@@ -226,7 +233,7 @@ def show_correlation(df):
         )
         stylize_axes(
             ax,
-            title="Correlation Heatmap",
+            title="Feature Correlation Heatmap",
             xlabel=None,
             ylabel=None,
             lw=params["lw"],
@@ -241,6 +248,7 @@ def show_correlation(df):
 
 # distributions for numerical
 def plot_distributions(df):
+    """Display histogram of a selected numeric column."""
     compact = st.session_state.get("compact_mode", False)
     params = get_style_params(compact)
 
@@ -286,6 +294,7 @@ def plot_distributions(df):
 
 
 def plot_categorical(df):
+    """Show bar chart of a selected categorical column (≤20 unique values)."""
     st.caption("Counts for categorical features with **less than 20 unique values**.")
 
     cat_cols = df.select_dtypes(include=["object", "category"]).columns
@@ -373,6 +382,7 @@ def show_boxplot(df: pd.DataFrame) -> None:
 
 # --- Value counts for categorical columns ---
 def show_value_counts(df: pd.DataFrame) -> None:
+    """Display frequency table for a chosen categorical variable."""
     st.caption("Shows frequency distribution of categories for each non-numeric variable.")
     cat_cols = df.select_dtypes(include=["object", "category"]).columns
     if len(cat_cols) == 0:

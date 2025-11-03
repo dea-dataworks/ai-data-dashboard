@@ -2,7 +2,6 @@
 Orchestrates layout, tabs, session state, and calls into EDA/ML/LLM modules.
 """
 
-
 from pathlib import Path
 
 import logging
