@@ -1,7 +1,15 @@
+"""Streamlit entrypoint for the AI Data Insight Dashboard.
+Orchestrates layout, tabs, session state, and calls into EDA/ML/LLM modules.
+"""
+
+
 from pathlib import Path
+
+import logging
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+
 import src.utils as utils
 import src.eda as eda
 import src.ml_models as ml
@@ -9,15 +17,14 @@ from src.ml_models import train_and_evaluate
 import src.llm_report as llm_report
 from src.utils import df_download_buttons, fig_download_button
 
-# LOGGING INFO
-import logging
+# logging:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
-# Set page configuration
+# === Page Config ===
 st.set_page_config(page_title="AI Data Insight Dashboard", layout="centered")
 st.title("AI Data Insight Dashboard")
 
-# --- Sidebar: Global Settings ---
+# === Sidebar / Global Settings ===
 with st.sidebar:
     utils.sidebar_global_settings()
     utils.sidebar_llm_settings()
@@ -27,11 +34,12 @@ def reset_app():
     st.session_state.clear() 
     st.session_state.df = None
 
-# --- Data Loading Section ---
-# Initialize 'df' in session_state if it doesn't exits
+# === Data Loading ===
+# Initialize 'df' in session_state if it doesn't exist
 if "df" not in st.session_state:
     st.session_state.df = None
 
+# === File Upload ===
 # Display file uploader if no DataFrame is loaded yet
 if st.session_state.df is None:
     uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
@@ -46,16 +54,17 @@ if st.session_state.df is None:
             st.session_state.df = df    # Store the dataframe in session state            
             st.session_state.dataset_name = Path(uploaded_file.name).stem
 
-            # LOGGING INFO
+            # logging:
             logging.info(f"File uploaded: {uploaded_file.name}, shape={df.shape}")
-
+            
             # Clear ML cache on dataset change
             for k in ("ml_output","ml_models_table_md","ml_rf_importances",
                     "ml_signature","ml_target","ml_excluded_cols",
                     "ml_cv_used","ml_cv_folds"):
                 st.session_state.pop(k, None)
 
-                #LOGGING INFO
+                # TODO(v0.3): move 'cleared ML cache' logging outside the pop loop.
+                # logging:
                 if uploaded_file and "ml_output" in st.session_state:
                     logging.info("Cleared ML cache after new upload.")
 
@@ -69,23 +78,25 @@ if st.session_state.df is None:
 else:
     st.info("Dataset loaded. Use the tabs below to explore your data.")
 
-# --- Application Tabs Section ---
+# === Tabs: Upload & Preview / EDA / ML / LLM Report ===
 # Only display tabs if a DataFrame is available in session state
 if st.session_state.df is not None:
     df = st.session_state.df 
 
     tab1, tab2, tab3, tab4 = st.tabs(["Upload & Preview", "EDA", "ML Insights", "LLM Report"])
 
+    # === Tab 1: Upload & Preview ===
     with tab1:
-        #LOGGING INFO
+        # logging:
         logging.info("Entered Tab 1 — Upload & Preview")
 
         st.subheader("Dataset Preview")      
         st.write(f"Shape: {df.shape[0]} rows x {df.shape[1]} columns")
         st.dataframe(df.head(10))
 
+    # === Tab 2: EDA ===
     with tab2:
-        #LOGGING INFO
+        # logging:
         logging.info("Entered Tab 2 — EDA")
 
         st.subheader("Exploratory Data Analysis")
@@ -117,9 +128,11 @@ if st.session_state.df is not None:
 
         with st.expander("Outlier Detection (Boxplot)", expanded=False):
             eda.show_boxplot(df)
-
+    
+    # TODO(v0.3): refactor ML Insights tab into modular functions (split UI, logic, metrics, plots).
+    # === Tab 3: ML Insights ===
     with tab3:
-        # LOGGING INFO
+        # logging:
         logging.info("Entered Tab 3 — ML Insights")
 
         st.subheader("Machine Learning")
@@ -189,7 +202,7 @@ if st.session_state.df is not None:
 
             elif should_render:
                 
-                # LOGGING INFO
+                # logging:
                 logging.info(f"Starting modeling — target={target}, exclusions={exclude_cols}, use_cv={use_cv}")
 
                 try:
@@ -209,7 +222,7 @@ if st.session_state.df is not None:
                             cv_out    = ml.cross_validate_models(X, y, cv_splits=cv_folds)
                             task_type = cv_out["task_type"]
 
-                            # LOGGING INFO
+                            # logging:
                             logging.info(f"Completed cross-validation — task={task_type}, models={list(cv_out['results'].keys())}")
 
 
@@ -219,9 +232,11 @@ if st.session_state.df is not None:
                             st.session_state["ml_excluded_cols"] = exclude_cols
                             st.session_state["ml_cv_used"]   = True
                             st.session_state["ml_cv_folds"]  = cv_folds
+                            
                             # Build a Markdown table expected by the LLM tab
                             try:
                                 # Construct a per-task DataFrame then to_markdown
+                                # TODO(v0.3): extract CV metrics table builder to utils (pure function).
                                 rows = []
                                 for model, m in cv_out["results"].items():
                                     if task_type == "classification":
@@ -264,6 +279,7 @@ if st.session_state.df is not None:
 
                         st.info("Cross-validation shows typical performance across folds. Turn off the checkbox to view the single 80/20 split and diagnostics plots.")
 
+                    # TODO(v0.3): simplify CV/single-split branching — move to ml_models.py
                     # ==============================
                     # ===== Single-split PATH ======
                     # ==============================
@@ -276,7 +292,7 @@ if st.session_state.df is not None:
                             output    = ml.train_and_evaluate(X, y, target)
                             task_type = output["task_type"]
 
-                            # LOGGING INFO
+                            # logging:
                             logging.info(f"Completed single-split modeling — task={task_type}, models={list(output['results'].keys())}")
 
 
@@ -296,6 +312,7 @@ if st.session_state.df is not None:
                                 st.session_state["ml_models_table_md"] = ""
 
                             # Extract one set of feature importances (e.g., Random Forest) for the report
+                            # TODO(v0.3): unify feature-importance extraction across tasks/models.
                             rf_top_k = 10
                             rf_importances = {}
                             for model_name, m in output.get("results", {}).items():
@@ -318,7 +335,7 @@ if st.session_state.df is not None:
 
                         st.write(f"### Detected Task: {task_type.capitalize()}")
 
-                        # ---- Classification ----
+                        # === Classification Results ===
                         if task_type == "classification":
                             summary_data = []
                             for model, metrics in output["results"].items():
@@ -353,6 +370,7 @@ if st.session_state.df is not None:
                                     else:
                                         st.write("No detailed report available.")
 
+                            # TODO(v0.3): unify feature-importance extraction across tasks/models.
                             # Feature Importances (Random Forest)
                             with st.expander("Feature Importances"):
                                 st.caption("Highlights the most influential features for classification, based on Random Forest importance scores.")
@@ -413,7 +431,7 @@ if st.session_state.df is not None:
                                 - **Weighted Avg**: Metric averaged across classes, weighted by their support; accounts for class imbalance.
                                 """)
 
-                        # ---- Regression ----
+                        # === Regression Results ===
                         elif task_type == "regression":
                             summary_data = []
                             for model, metrics in output["results"].items():
@@ -516,6 +534,9 @@ if st.session_state.df is not None:
 
 
                                         """)
+                # TODO(v0.3): centralize exception handling in a helper (utils.handle_error)
+                #             with optional file log and sidebar display.
+
                 except ValueError as e:
                     st.error(str(e))
                 except Exception as e:
@@ -523,9 +544,10 @@ if st.session_state.df is not None:
             
             else:
                 st.info("Ready. Click **Run models** to train/evaluate with the current settings.")
-           
+    
+    # === Tab 4: LLM Report === 
     with tab4:
-        # LOGGING INFO
+        # logging:
         logging.info("Entered Tab 4 — LLM Report")
 
         llm_report.render_llm_tab(
@@ -536,11 +558,11 @@ if st.session_state.df is not None:
         if excluded_cols:
             st.caption(f"⚠️ The following columns were excluded from modeling: {', '.join(excluded_cols)}")
 
-# --- Reset Button Section ---
+# === Reset Button ===
 if st.session_state.df is not None:
     st.markdown("---") # Add a separator before the reset button for better UI
     if st.button("Reset Application"):
-        # LOGGING INFO
+        # logging:
         logging.info("Reset button clicked — clearing session state.")
 
         reset_app()
