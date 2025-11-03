@@ -1,15 +1,20 @@
 """Utility functions — shared helpers for preprocessing, signatures, and plotting."""
 
 from __future__ import annotations
+
 import os
-import pandas as pd
 from datetime import datetime
-from io import StringIO, BytesIO
+from io import BytesIO, StringIO
+
+import matplotlib.pyplot as plt
+import pandas as pd
 import streamlit as st
+from sklearn.metrics import ConfusionMatrixDisplay, RocCurveDisplay
+
 from .ml_models import train_and_evaluate
 from .eda import get_style_params, PlotStyle, stylize_axes
-import matplotlib.pyplot as plt
-from sklearn.metrics import ConfusionMatrixDisplay, RocCurveDisplay
+
+# TODO(v0.3): integrate unified error handler across all utilities.
 
 # ---------- EDA text utilities ----------
 def generate_summary_stats(df: pd.DataFrame, max_cols: int = 15) -> str:
@@ -28,6 +33,7 @@ def generate_summary_stats(df: pd.DataFrame, max_cols: int = 15) -> str:
         dtypes_view += f"\n... ({df.shape[1]-max_cols} more columns)"
     lines.append("Column dtypes:\n" + dtypes_view)
 
+    # TODO(v0.3): consider sampling or caching summary stats for large datasets.
     # Describe with include='all' can be big; cap columns for readability
     desc = df.describe(include="all").T
     if len(desc) > max_cols:
@@ -182,6 +188,7 @@ def format_metrics_df(df: pd.DataFrame) -> pd.DataFrame:
     df["value"] = df.apply(_fmt, axis=1)
     return df
 
+# TODO(v0.3): unify plotting helpers under one interface.
 def plot_confusion_matrix(y_true, y_pred, labels):
     compact = st.session_state.get("compact_mode", False)
     params = get_style_params(compact)
@@ -283,6 +290,7 @@ def df_download_buttons(title: str, df: pd.DataFrame, base: str = "dashboard", e
         use_container_width=True
     )
 
+    # TODO(v0.3): add fallback for Excel writer if openpyxl missing.
     # Excel (secondary, only if enabled)
     if excel == "on":
         xbuf = BytesIO()
@@ -314,6 +322,7 @@ def fig_download_button(title: str, fig, base: str = "dashboard", dpi: int = 150
         use_container_width=True
     )
 
+# TODO(v0.3): move provider checks to a separate llm_providers helper.
 # --- Sidebar Helpers ---
 def _openai_is_available() -> bool:
     try:
@@ -390,3 +399,5 @@ def ml_signature(df, dataset_name, target, excluded_cols, cv_used, cv_folds, see
         int(cv_folds) if cv_used else None,
         int(seed) if seed is not None else None,
     )
+
+
