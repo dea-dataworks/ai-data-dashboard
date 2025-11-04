@@ -12,7 +12,7 @@ _Last verified: 2025-10-09_
 
 ## 2️⃣ Run Path & Inputs
 - Entry command: `streamlit run app.py`
-- Inputs: `data/titanic.csv` or `data/insurance.csv` (or user uploads)
+- Inputs: `examples/titanic.csv` or `examples/insurance.csv` (or user uploads)
 - Working directory: run from project root
 - Expected output: Streamlit opens at http://localhost:8501
 

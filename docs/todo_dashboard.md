@@ -47,4 +47,4 @@ This file tracks pending improvements and refactors planned for the next version
 ## Notes
 These tasks prepare the app for v0.3 “productionization” — containerized, modular, and ready for API integration.
 
-TODO When upgrading to v0.3 cycle, bump LangChain packages to 0.3., re-test report tab.*
+TODO When upgrading to v0.3 cycle, bump LangChain packages to 0.3., re-test report tab.* and update RUNBOOK
