@@ -81,34 +81,51 @@ By default, the dashboard uses **Ollama (local Mistral)**. You can also enable *
 
 ---
 
-## Project Structure (typical)
+## Project Structure 
 
 ```
-<repo-root>/
-├─ app.py
-├─ src/
-│  ├─ eda.py
-│  ├─ ml_models.py
-│  ├─ llm_report.py
-│  ├─ utils.py
-│  └─ __init__.py
-├─ data/
-│  ├─ titanic.csv
-│  └─ insurance.csv
-├─ assets/
-│  ├─ demo.gif
-│  ├─ eda.gif
-│  ├─ ml.gif
-│  └─ screenshots/
-│     ├─ preview.png
-│     ├─ eda.png
-│     ├─ ml.png
-│     └─ report.png
-├─ requirements.txt
-├─ README.md
-├─ LICENSE
+ai-data-dashboard/
+├─ .env.example
+├─ .gitignore
 ├─ CHANGELOG.md
-└─ .gitignore
+├─ LICENSE
+├─ README.md
+├─ ROADMAP.md
+├─ app.py
+│
+├─ docs/
+│  ├─ README_assets/
+│  │  ├─ demo.gif
+│  │  ├─ eda.gif
+│  │  ├─ ml.gif
+│  │  └─ screenshots/
+│  │     ├─ eda.png
+│  │     ├─ ml.png
+│  │     ├─ preview.png
+│  │     └─ report.png
+│  ├─ RUNBOOK.md
+│  ├─ dashboard_flow.png
+│  ├─ todo_dashboard.md
+│  └─ walkthrough_dashboard.md
+│
+├─ examples/
+│  ├─ insurance.csv
+│  └─ titanic.csv
+│
+├─ requirements.txt
+│
+├─ src/
+│  ├─ __init__.py
+│  ├─ eda.py
+│  ├─ fonts/
+│  │  └─ Inter-VariableFont_opsz,wght.ttf
+│  ├─ llm_report.py
+│  ├─ ml_models.py
+│  └─ utils.py
+│
+└─ tests/
+   └─ .keep
+
 ```
 
 ---
