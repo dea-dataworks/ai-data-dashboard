@@ -3,7 +3,7 @@
 **Upload a CSV, explore EDA, run baseline ML, and auto‑generate a client‑ready report.**  
 Built with Streamlit, scikit‑learn, and a structured LLM report (Ollama by default, OpenAI optional).
 
-![Demo](assets/demo.gif)
+![Demo](docs/README_assets/demo.gif)
 
 ---
 
@@ -117,14 +117,14 @@ By default, the dashboard uses **Ollama (local Mistral)**. You can also enable *
 
 | Preview Snapshot | EDA Snapshot | ML Insights | LLM Report |
 | --- | --- | --- | --- |
-|![PREVIEW](assets/screenshots/preview.png) | ![EDA](assets/screenshots/eda.png) | ![ML](assets/screenshots/ml.png) | ![Report](assets/screenshots/report.png) |
+|![PREVIEW](docs/README_assets/screenshots/preview.png) | ![EDA](docs/README_assets/screenshots/eda.png) | ![ML](docs/README_assets/screenshots/ml.png) | ![Report](docs/README_assets/screenshots/report.png) |
 
 ---
 
 ### Extra GIFs
 
-- [EDA expanders demo (GIF)](assets/eda.gif)  
-- [ML expanders demo (GIF)](assets/ml.gif)
+- [EDA expanders demo (GIF)](docs/README_assets/eda.gif)  
+- [ML expanders demo (GIF)](docs/README_assets/ml.gif)
 
 ## Notes & Configuration
 
