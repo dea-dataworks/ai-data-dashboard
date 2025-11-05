@@ -72,3 +72,8 @@ Notes
 - Run and smoke-test the app before pushing.
 - Use git log --oneline --graph to confirm the merge history looks clean.
 - If conflicts appear, Git will prompt you; resolve them, then git add . + git commit to finalize the merge.
+
+### Week 4 – Unit Testing Summary
+- Added `tests/test_refactor.py` (EDAReport)
+- 4 tests (schema, missing, duplicates, invalid target) → all passed.
+- Verified pytest discovery with clean venv.
