@@ -32,5 +32,12 @@ docs/
 │   └── refactor_overview.png  # Shared app diagram
 ```
 
+### Architecture Overview
+
+The three portfolio apps share a similar modular structure — data processing, model logic, Streamlit UI, and an optional LLM layer for insight generation.
+
+![Cross-App Refactor Overview](docs/README_assets/refactor_overview.png)
+
+
 ### Preview
 ![Dashboard EDA demo](docs/README_assets/eda.gif)
