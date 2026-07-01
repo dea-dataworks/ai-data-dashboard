@@ -1,4 +1,7 @@
-# AI Data Insight Dashboard — v0.2
+# AI Data Dashboard (Advanced)
+
+This repository contains feature-rich version of the AI Data Dashboard. For a streamlined implementation rebuilt from scratch with a simplified architecture, see the ai-data-dashboard repository.
+
 
 **Upload a CSV, explore EDA, run baseline ML, and auto‑generate a client‑ready report.**  
 Built with Streamlit, scikit‑learn, and a structured LLM report (Ollama by default, OpenAI optional).
@@ -87,10 +90,8 @@ By default, the dashboard uses **Ollama (local Mistral)**. You can also enable *
 ai-data-dashboard/
 ├─ .env.example
 ├─ .gitignore
-├─ CHANGELOG.md
 ├─ LICENSE
 ├─ README.md
-├─ ROADMAP.md
 ├─ app.py
 │
 ├─ docs/
@@ -122,9 +123,6 @@ ai-data-dashboard/
 │  ├─ llm_report.py
 │  ├─ ml_models.py
 │  └─ utils.py
-│
-└─ tests/
-   └─ .keep
 
 ```
 
@@ -181,5 +179,5 @@ This project is released under the **MIT License**. See `LICENSE` for details.
 
 ## 🔗 Links
 
-- Project Page: https://github.com/dea-dataworks/ai-data-dashboard
+- Project Page: https://github.com/daniel-e-alarcon/ai-data-dashboard-advanced
 - Author: Daniel E. Alarcon/ https://www.linkedin.com/in/daniel-e-alarcon
