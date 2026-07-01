@@ -104,11 +104,7 @@ ai-data-dashboard/
 │  │     ├─ ml.png
 │  │     ├─ preview.png
 │  │     └─ report.png
-│  ├─ RUNBOOK.md
-│  ├─ dashboard_flow.png
-│  ├─ todo_dashboard.md
-│  └─ walkthrough_dashboard.md
-│
+│  │
 ├─ examples/
 │  ├─ insurance.csv
 │  └─ titanic.csv
