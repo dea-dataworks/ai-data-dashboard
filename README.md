@@ -152,18 +152,6 @@ ai-data-dashboard/
 
 ---
 
-## Roadmap
-
-- **v0.3 (ideas):**
-  - Polished “Key patterns & signals” (with robust numeric/categorical handling)
-  - More models (e.g., XGBoost optional), hyperparameter presets
-  - Theming polish across plots (consistent sizes/labels/tooltips)
-  - Hosted demo link (Streamlit Community Cloud)
-
-See `ROADMAP.md` for the live plan.
-
----
-
 ## License
 
 This project is released under the **MIT License**. See `LICENSE` for details.
